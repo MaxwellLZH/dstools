@@ -4,7 +4,7 @@ from jinja2 import Template
 import utils
 import metrics
 import keras_extension
-
+import sklearn_extension
 
 def list_docs(module):
     methods = [getattr(module, i) for i in dir(module)
@@ -12,7 +12,7 @@ def list_docs(module):
                not isinstance(getattr(module, i), (ModuleType))]
     docs = dict()
     for m in methods:
-        if hasattr(m, '__doc__'):
+        if hasattr(m, '__doc__') and m.__doc__ is not None:
             doc = m.__doc__.split('\n')[0].strip()
         else:
             doc = 'No documentation found.'
@@ -23,7 +23,7 @@ def list_docs(module):
 
 documentation = dict()
 
-for m in [utils, metrics, keras_extension]:
+for m in [utils, metrics, keras_extension, sklearn_extension]:
     documentation.update(list_docs(m))
 
 with open('./README.template', 'r') as f:
