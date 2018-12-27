@@ -3,6 +3,7 @@ from jinja2 import Template
 
 import utils
 import metrics
+import keras_extension
 
 
 def list_docs(module):
@@ -22,7 +23,7 @@ def list_docs(module):
 
 documentation = dict()
 
-for m in [utils, metrics]:
+for m in [utils, metrics, keras_extension]:
     documentation.update(list_docs(m))
 
 with open('./README.template', 'r') as f:
