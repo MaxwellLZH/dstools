@@ -1,4 +1,5 @@
 def maybe_mkdir(path, warn=False):
+    """ Create directory when it didn't exist."""
     import os
     import warnings
 

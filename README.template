@@ -1,0 +1,6 @@
+## Handy tools for data scientists
+
+## List of handy tools
+{% for name, doc in documentation.items() %}
+**{{ name }}** `{{ doc }}`
+{% endfor %}
