@@ -33,7 +33,7 @@ def list_docs(module):
             code = m.__code__
             file = code.co_filename
             # get the path starting from the module name
-            file = file[file.index(module_name):]
+            file = file[file.index(module_name):].replace("\\", "/")
             lineno = code.co_firstlineno
         else:
             # class object
