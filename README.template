@@ -2,5 +2,5 @@
 
 ## List of handy tools
 {% for name, doc in documentation.items() %}
-**{{ name }}** `{{ doc }}`
+[{{ name }}](!https://github.com/Max1993Liu/dstools/blob/master/{{ doc.file }}#L{{ doc.lineno }}) `{{ doc.doc }}`
 {% endfor %}

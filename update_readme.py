@@ -1,22 +1,46 @@
 from types import ModuleType
 from jinja2 import Template
+from collections import namedtuple
 
 import utils
 import metrics
 import keras_extension
 import sklearn_extension
 
+
+DOC = namedtuple('DOC', ['doc', 'file', 'lineno'])
+
+
 def list_docs(module):
+    module_name = module.__name__
     methods = [getattr(module, i) for i in dir(module)
                if not i.startswith('_') and
                not isinstance(getattr(module, i), (ModuleType))]
     docs = dict()
     for m in methods:
+        # unwrap the decorators
+        while hasattr(m, '__wrapped__'):
+            m = getattr(m, '__wrapped__')
+
+        name = m.__name__
         if hasattr(m, '__doc__') and m.__doc__ is not None:
             doc = m.__doc__.split('\n')[0].strip()
         else:
             doc = 'No documentation found.'
-        docs[m.__name__] = doc
+
+        if hasattr(m, '__code__'):
+            # function object
+            code = m.__code__
+            file = code.co_filename
+            # get the path starting from the module name
+            file = file[file.index(module_name):]
+            lineno = code.co_firstlineno
+        else:
+            # class object
+            file = '{}/__init__.py'.format(module_name)
+            lineno = 1
+
+        docs[name] = DOC(doc, file, lineno)
 
     return docs
 
