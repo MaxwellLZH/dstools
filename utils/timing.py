@@ -37,3 +37,11 @@ def get_stats(statement):
     os.remove(tmp_file)
     stats.strip_dirs()
     return stats
+
+
+def print_stats(statement, *keys):
+    """ Print out the profiling detail from the statement sorted by *keys"""
+    keys = keys or ['cumulative']
+    stats = get_stats(statement)
+    stats.sort_stats(*keys)
+    stats.print_stats()
