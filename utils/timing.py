@@ -22,3 +22,18 @@ def timeit(logger=None):
             return result
         return wrapped
     return inner
+
+
+def get_stats(statement):
+    """ Return a pstats.Stats object from a statement. """
+    import os
+    import uuid
+    import cProfile as profiler
+    import pstats
+
+    tmp_file = './{}.statas'.format(uuid.uuid1())
+    profiler.run(statement, filename=tmp_file)
+    stats = pstats.Stats(tmp_file)
+    os.remove(tmp_file)
+    stats.strip_dirs()
+    return stats
