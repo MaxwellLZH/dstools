@@ -27,5 +27,7 @@ def check_same_length(f):
     return wrapped
 
 
-
-
+def ngram(iterable, n=2):
+    """ Generating n-gram from iterable."""
+    length = len(iterable)
+    return [iterable[i:i+n] for i in range(length-n+1)]
