@@ -1,3 +1,3 @@
-from sklearn_extension.binning import *
-from sklearn_extension.feature_selection import *
-from sklearn_extension.preprocessing import *
+from .binning import *
+from .feature_selection import *
+from .preprocessing import *
