@@ -1,11 +1,37 @@
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted, assert_all_finite
-from sklearn.preprocessing.label import _encode
 import pandas as pd
 import warnings
 
 from sklearn.utils import check_array
 from sklearn.utils import column_or_1d
+
+
+def _encode_python(values, uniques=None, encode=False, unseen='warn'):
+    """ Modified from the Scikit version except handles unseen values"""
+    if uniques is None:
+        uniques = sorted(set(values))
+        uniques = np.array(uniques, dtype=values.dtype)
+    if encode:
+        table = {val: i for i, val in enumerate(uniques)}
+        try:
+            encoded = np.array([table[v] for v in values])
+        except KeyError as e:
+            msg = "y contains previously unseen labels: %s" % str(e)
+            if unseen in ('silent', 'warn'):
+                UNSEEN = len(uniques)
+                encoded = np.array([table.get(v, UNSEEN) for v in values])
+                if unseen == 'warn':
+                    warnings.warn(msg)
+            elif unseen == 'raise':
+                raise ValueError("y contains previously unseen labels: %s"
+                                 % str(e))
+            else:
+                raise ValueError('The supported options for `unseen` are: {}'
+                                 .format(['silent', 'warn', 'raise']))
+        return uniques, encoded
+    else:
+        return uniques
 
 
 class NormDistOutlierRemover(BaseEstimator, TransformerMixin):
@@ -150,15 +176,17 @@ class QuantileOutlierRemover(BaseEstimator, TransformerMixin):
 
 
 class OrdinalEncoder(BaseEstimator, TransformerMixin):
-    """ Similar Scikit-Learn OrdinalEncoder but allows for
-        arbitrary ordering in the columns
+    """ Similar Scikit-Learn OrdinalEncoder but allows for arbitrary ordering in the columns,
+        also handles unseen values during transform() process.
     """
-    def __init__(self, cols=None, fill=True, error='warn'):
+    def __init__(self, cols=None, fill=True, error='warn', unseen='warn'):
         """
         :param cols: A list of column names to apply transformations, default for all the columns
         :param fill: Whether to fill missing value before encoding
         :param error: Specify the action when the DataFrame passed to transform doesn't have all the columns,
             supported actions are ['raise', 'ignore', 'warn']
+        :param unseen: Specify the action when encountered with unseen values,
+            supported actions are ['raise, 'silent', 'warn']
         """
         if isinstance(cols, str):
             self.cols = [cols]
@@ -166,6 +194,7 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
             self.cols = cols
         self.fill = fill
         self.error = error
+        self.unseen = unseen
 
     def fit(self, X: pd.DataFrame, y=None):
         X = X[self.cols] if self.cols else X
@@ -176,7 +205,7 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
         self.categories_ = dict()
 
         for col in X:
-            cutoff = _encode(X[col].astype(str))
+            cutoff = _encode_python(X[col].astype(str))
             self.categories_[col] = cutoff
         return self
 
@@ -197,7 +226,7 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
             else:
                 x[col] = x[col].fillna('_MISSING').astype(str)
             cutoff = self.categories_[col]
-            _, x[col] = _encode(x[col], uniques=cutoff, encode=True)
+            _, x[col] = _encode_python(x[col], uniques=cutoff, encode=True, unseen=self.unseen)
         return x
 
 

@@ -36,7 +36,8 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         for col in self.cols:
             if col not in self.mapping_:
                 raise ValueError('Column {} not seen during the fit() process.'.format(col))
-            x[col] = x[col].map(self.mapping_[col])
+            # TODO: Better way to deal with values that didn't appear in the fit() process
+            x[col] = x[col].map(self.mapping_[col]).fillna(0)
         return x
 
     def inverse_transform(self, X: pd.DataFrame, y=None):
