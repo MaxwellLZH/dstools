@@ -1,8 +1,8 @@
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted, assert_all_finite
 import pandas as pd
+import numpy as np
 import warnings
-from types import FunctionType, LambdaType
 
 from sklearn.utils import check_array
 from sklearn.utils import column_or_1d
