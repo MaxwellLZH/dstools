@@ -1,5 +1,6 @@
 from keras.callbacks import Callback
 import numpy as np
+from pandas import DataFrame
 from sklearn.metrics import roc_auc_score
 
 
@@ -30,6 +31,7 @@ class BaseEpochEvaluator(Callback):
             self.monitor_op = np.greater
 
     def on_train_begin(self, logs=None):
+        self.metrics = list()
         self.wait = 0
         self.stopped_epoch = 0
         self.best = np.inf if self.mode == 'min' else -np.inf
@@ -69,6 +71,26 @@ class BaseEpochEvaluator(Callback):
             return '{} on {} data: {:.2%}.'.format(self.eval_name.upper(), mode, metric), metric
         else:
             return '', None
+
+    def plot_metric(self, ax=None):
+        if not self.metrics:
+            raise ValueError('The callback has not been used.')
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('Matplotlib must be installed for this to work.')
+
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
+
+        metrics = DataFrame(self.metrics)
+        train_col = 'train_{}'.format(self.eval_name)
+        val_col = 'val_{}'.format(self.eval_name)
+
+        ax.plot(metrics['epoch'], metrics[train_col], label=train_col)
+        ax.plot(metrics['epoch'], metrics[val_col], label=val_col)
+        ax.legend()
+        return ax
 
 
 class AUCEpochEvaluator(BaseEpochEvaluator):
