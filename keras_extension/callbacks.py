@@ -24,6 +24,7 @@ class BaseEpochEvaluator(Callback):
         self.stopped_epoch = 0
         self.wait = 0
         self.best = None
+        self.best_weights = None
 
         if self.mode == 'min':
             self.monitor_op = np.less
@@ -54,14 +55,19 @@ class BaseEpochEvaluator(Callback):
         print('\n'.join([train_str, val_str]))
 
         # check for early stopping
-        if self.monitor_op(val_metric, self.best):
-            self.best = val_metric
-            self.wait = 0
-        else:
-            self.wait += 1
-            if self.wait >= self.patience:
-                self.stopped_epoch = epoch
-                self.model.stop_training = True
+        if self.earlystopping:
+            if self.monitor_op(val_metric, self.best):
+                self.best_weights = self.model.get_weights()
+                self.best = val_metric
+                self.wait = 0
+            else:
+                self.wait += 1
+                if self.wait >= self.patience:
+                    self.stopped_epoch = epoch
+                    self.model.stop_training = True
+                    self.model.set_weights(self.best_weights)
+                    print('Early stopped at epoch {}.'
+                          'Restoring weight from the best epoch.'.format(epoch))
 
     def _eval(self, data=None, mode='train'):
         if data:
