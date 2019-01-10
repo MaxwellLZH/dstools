@@ -1,4 +1,12 @@
 import functools
+from types import FunctionType, LambdaType
+try:
+    from sklearn.utils import is_scalar_nan
+except ImportError:
+    def is_scalar_nan(x):
+        import numbers
+        import numpy as np
+        return bool(isinstance(x, (numbers.Real, np.floating)) and np.isnan(x))
 
 
 def maybe_mkdir(path, warn=False):
@@ -39,20 +47,51 @@ def ngram(iterable, n=2):
     return [iterable[i:i+n] for i in range(length-n+1)]
 
 
-def na_default(default_value):
-    """ A decorator that checks the first argument, if it's nan return the default value."""
-    def is_nan(x):
-        """ A copy of sklearn.utils.is_scalar_nan"""
-        import numbers
-        import numpy as np
-        return bool(isinstance(x, (numbers.Real, np.floating)) and np.isnan(x))
+def set_default(criteria=None, default_value=None):
+    """ A decorator that checks the first argument, if meets the criteria then replace it with default_value
+        The criteria can be a list of values or a callable that returns boolean. Default is [None]
+    """
+    criteria = criteria or [None]
+    if isinstance(criteria, (list, tuple)):
+        check_f = lambda x: x in criteria
+    elif callable(criteria):
+        check_f = criteria
+    else:
+        raise ValueError('The criteria should either be a list or a callable.')
 
     def decorator(f):
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
-            if is_nan(args[0]):
-                return default_value
-            else:
-                return f(*args, **kwargs)
+            args = list(args)
+            if check_f(args[0]):
+                args[0] = default_value
+            return f(*args, **kwargs)
         return wrapped
     return decorator
+
+
+def return_default(criteria=None, default_value=None):
+    """ A decorator that checks the first argument, if meets the criteria then simply return the default_value
+        The criteria can be a list of values or a callable that returns boolean. Default is [None]
+    """
+    criteria = criteria or [None]
+    if isinstance(criteria, (list, tuple)):
+        check_f = lambda x: x in criteria
+    elif callable(criteria):
+        check_f = criteria
+    else:
+        raise ValueError('The criteria should either be a list or a callable.')
+
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapped(*args, **kwargs):
+            if check_f(args[0]):
+                return default_value
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
+
+
+na_return_default = functools.partial(return_default, criteria=is_scalar_nan)
+na_set_default = functools.partial(set_default, criteria=is_scalar_nan)
+
