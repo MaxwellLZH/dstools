@@ -66,7 +66,7 @@ class BaseEpochEvaluator(Callback):
                     self.stopped_epoch = epoch
                     self.model.stop_training = True
                     self.model.set_weights(self.best_weights)
-                    print('Early stopped at epoch {}.'
+                    print('Early stopped at epoch {}. '
                           'Restoring weight from the best epoch.'.format(epoch))
 
     def _eval(self, data=None, mode='train'):
