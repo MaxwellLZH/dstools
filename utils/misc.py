@@ -92,6 +92,16 @@ def return_default(criteria=None, default_value=None):
     return decorator
 
 
-na_return_default = functools.partial(return_default, criteria=is_scalar_nan)
-na_set_default = functools.partial(set_default, criteria=is_scalar_nan)
+def flatten_list(nested_list):
+    """ Flatten a nested list regardless of the depth."""
+    flattened_list = list()
+    for elem in nested_list:
+        if isinstance(elem, (list, tuple)):
+            flattened_list.extend(flatten_list(elem))
+        else:
+            flattened_list.append(elem)
+    return flattened_list
 
+
+# na_return_default = functools.partial(return_default, criteria=is_scalar_nan)
+# na_set_default = functools.partial(set_default, criteria=is_scalar_nan)
