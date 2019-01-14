@@ -14,7 +14,7 @@ def build_template(name):
     temp_file = os.path.join('./templates',  name)
     with open(temp_file, 'r+') as f:
         template = f.readlines()
-    return Template(os.linesep.join(template))
+    return Template(''.join(template))
 
 
 def as_template_function(f):

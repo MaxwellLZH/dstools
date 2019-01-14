@@ -6,4 +6,5 @@ def find_duplicates(table_name, col, min_count=1):
     ...
 
 
-print(find_duplicates('table_name', 'cert_no', 5))
+if __name__ == '__main__':
+    print(find_duplicates(table_name='table_name', col='cert_no', min_count=5))
