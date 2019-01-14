@@ -1,0 +1,5 @@
+select {{ col }, cnt from
+(select {{ col }}, count(*) as cnt
+from {{ table_name }}
+group by {{ col }}) a
+where cnt > {{ min_count }};
