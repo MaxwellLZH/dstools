@@ -3,8 +3,8 @@ from sklearn.exceptions import NotFittedError
 import pandas as pd
 import numpy as np
 
-from sklearn_extension.utils import force_zero_one, make_series, searchsorted, assign_group
-from sklearn_extension.binning.unsupervised import EqualFrequencyBinning, EqualWidthBinning
+from ..utils import force_zero_one, make_series, searchsorted, assign_group
+from ..binning.unsupervised import EqualFrequencyBinning, EqualWidthBinning
 
 
 class ChiSquareBinning(BaseEstimator, TransformerMixin):
@@ -43,8 +43,14 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         # self.history = list()  # a list of (Merge From, Merge to, Criteria)
         # self.history_summary = list()
 
-    @staticmethod
-    def calculate_chisquare(X: pd.Series, y: pd.Series, expected_ratio: float) -> float:
+        self._chisquare_cache = dict()
+
+    def calculate_chisquare(self, X: pd.Series, y: pd.Series, expected_ratio: float) -> float:
+        # try to get from the cache first
+        unique_x = frozenset(X)
+        if self._chisquare_cache.get(unique_x, False):
+            return self._chisquare_cache[unique_x]
+
         summary = y.groupby(X).agg(['count', 'sum']).rename(columns={'sum': 'actual_pos'})
         summary['actual_neg'] = summary['count'] - summary['actual_pos']
         summary['expected_pos'] = summary['count'] * expected_ratio
@@ -52,7 +58,9 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         chi2 = (summary['actual_pos'] - summary['expected_pos']) ** 2 / summary['expected_pos'] + \
                (summary['actual_neg'] - summary['expected_neg']) ** 2 / summary['expected_neg']
         dgfd = summary.shape[0] - 1
-        return chi2.sum() / dgfd
+        chi2 = chi2.sum() / dgfd
+        self._chisquare_cache[unique_x] = chi2
+        return chi2
 
     @staticmethod
     def sorted_two_gram(X):

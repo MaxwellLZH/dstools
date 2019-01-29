@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import warnings
 
-from sklearn_extension.utils import searchsorted, wrap_with_inf, assign_group, make_series
+from ..utils import searchsorted, wrap_with_inf, assign_group, make_series
 
 
 class EqualWidthBinning(BaseEstimator, TransformerMixin):

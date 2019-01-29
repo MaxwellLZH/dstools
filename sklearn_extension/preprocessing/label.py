@@ -3,7 +3,7 @@ from sklearn.utils import assert_all_finite
 from sklearn.utils.validation import check_is_fitted
 import pandas as pd
 
-from sklearn_extension.feature_selection import woe
+from ..feature_selection import woe
 
 
 class WoeEncoder(BaseEstimator, TransformerMixin):

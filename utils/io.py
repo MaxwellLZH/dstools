@@ -1,4 +1,5 @@
 import contextlib
+import pandas as pd
 
 
 @contextlib.contextmanager
@@ -22,3 +23,9 @@ def capture_output():
         out[0] = out[0].getvalue().splitlines()
         out[1] = out[1].getvalue().splitlines()
 
+
+def read_csv(path, **kwargs):
+    """ Read multiple csv files and stack them rowwise."""
+    from glob import glob
+    files = [pd.read_csv(f, **kwargs) for f in glob(path)]
+    return pd.concat(files, axis=0)

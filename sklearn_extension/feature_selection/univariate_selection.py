@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn_extension.utils import make_series
+from ..utils import make_series
 import pandas as pd
 
 
