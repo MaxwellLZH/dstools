@@ -26,6 +26,14 @@ def make_series(i, reset_index=True) -> pd.Series:
     return series
 
 
+def _searchsorted(a, v):
+    """ Same as np.searchsorted(a, v, side='left') but faster for our purpose."""
+    for i, c in enumerate(a):
+        if c >= v:
+            return i
+    return len(a)
+
+
 def searchsorted(a, v, fill=-1):
     """ Encode values in v with ascending cutoff points in a. Similar to numpy.searchsorted
         Left open right close except for the leftmost interval, which is close at both ends.
@@ -38,7 +46,7 @@ def searchsorted(a, v, fill=-1):
             # the leftmost interval close at both ends
             encoded.append(1)
         else:
-            encoded.append(np.searchsorted(a, value, side='left'))
+            encoded.append(_searchsorted(a, value))
     return encoded
 
 
@@ -47,7 +55,7 @@ def assign_group(x, bins):
     """
     # add infinite at the end
     extended_cutoff = list(bins) + [np.inf]
-    return [v if np.isnan(v) else extended_cutoff[np.searchsorted(extended_cutoff, v, side='left')] \
+    return [v if np.isnan(v) else extended_cutoff[_searchsorted(extended_cutoff, v)] \
                                                  for v in x]
 
 

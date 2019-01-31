@@ -101,6 +101,7 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
 
     def encode_with_label(self, X: pd.Series, y: pd.Series) -> pd.Series:
         """ Encode categorical features with its percentage of positive samples"""
+        X, y = make_series(X), make_series(y)
         pct_pos = y.groupby(X).mean()
         # save the mapping for transform()
         self.discrete_encoding[X.name] = pct_pos
@@ -131,8 +132,8 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         minimum = min(mapping)
 
         def _replace(mapping: Dict[int, list], to_replace: int, value: int):
-            mapping[to_replace].extend(mapping[value])
-            del mapping[value]
+            mapping[value].extend(mapping[to_replace])
+            del mapping[to_replace]
             return mapping
 
         if replace_value == minimum:
@@ -200,7 +201,8 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
     def _fit(self, X, y, **fit_parmas):
         """ Fit a single feature and return the cutoff points"""
         y = force_zero_one(y)
-        X, y = make_series(X), make_series(y)
+        y = make_series(y)
+
         # if X is discrete, encode with positive ratio in y
         if X.name in self.categorical_cols:
             X = self.encode_with_label(X, y)
@@ -211,7 +213,7 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         if self.prebin and n_bins > self.prebin:
             EFB = EqualFrequencyBinning(n=self.prebin, encode=False)
             X = EFB.fit_transform(X)
-            X = make_series(X)
+            # X = make_series(X)
 
         # convert to mapping
         mapping = y.groupby(X).apply(list).to_dict()
@@ -233,7 +235,7 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
             while len(mapping) - 1 > 2 and not self.is_monotonic_post_bin(mapping):
                 mapping = self.merge_chisquare(mapping)
 
-        return list(mapping.keys())
+        return sorted(mapping.keys())
 
     def _transform(self, X: pd.Series, y=None):
         """ Transform a single feature"""
