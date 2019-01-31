@@ -2,9 +2,10 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 import pandas as pd
 import numpy as np
+from typing import Dict, Iterable, Tuple
 
 from ..utils import force_zero_one, make_series, searchsorted, assign_group
-from ..binning.unsupervised import EqualFrequencyBinning, EqualWidthBinning
+from ..binning.unsupervised import EqualFrequencyBinning
 
 
 class ChiSquareBinning(BaseEstimator, TransformerMixin):
@@ -36,29 +37,28 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         self.discrete_encoding = dict()
         # A dictionary mapping column name to its cutoff points
         self.bins = dict()
-
         self.prebin = prebin
-
-        # self.keep_history = keep_history
-        # self.history = list()  # a list of (Merge From, Merge to, Criteria)
-        # self.history_summary = list()
 
         self._chisquare_cache = dict()
 
-    def calculate_chisquare(self, X: pd.Series, y: pd.Series, expected_ratio: float) -> float:
+    def calculate_chisquare(self, mapping: Dict[int, list], candidates: Iterable) -> float:
         # try to get from the cache first
-        unique_x = frozenset(X)
+        unique_x = frozenset(candidates)
         if self._chisquare_cache.get(unique_x, False):
             return self._chisquare_cache[unique_x]
 
-        summary = y.groupby(X).agg(['count', 'sum']).rename(columns={'sum': 'actual_pos'})
-        summary['actual_neg'] = summary['count'] - summary['actual_pos']
-        summary['expected_pos'] = summary['count'] * expected_ratio
-        summary['expected_neg'] = summary['count'] - summary['expected_pos']
-        chi2 = (summary['actual_pos'] - summary['expected_pos']) ** 2 / summary['expected_pos'] + \
-               (summary['actual_neg'] - summary['expected_neg']) ** 2 / summary['expected_neg']
-        dgfd = summary.shape[0] - 1
-        chi2 = chi2.sum() / dgfd
+        count = {k: len(v) for k, v in mapping.items()}
+        actual_pos = {k: sum(v) for k, v in mapping.items()}
+        actual_neg = {k: (count[k] - actual_pos[k]) for k in candidates}
+        expected_ratio = sum(actual_pos.values()) / sum(count.values())
+        expected_pos = {k: v * expected_ratio for k, v in count.items()}
+        expected_neg = {k: (count[k] - expected_pos[k]) for k in candidates}
+
+        chi2 = sum((actual_pos[k] - expected_pos[k])**2 / expected_pos[k] + \
+                   (actual_neg[k] - expected_neg[k])**2 / expected_neg[k]
+                   for k in candidates)
+        dgfd = len(candidates) - 1
+        chi2 = chi2 / dgfd
         self._chisquare_cache[unique_x] = chi2
         return chi2
 
@@ -67,7 +67,7 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         """ Two gram with the left element smaller than the right element in each pair
             eg. sorted_two_gram([1, 3, 2]) -> [(1, 2), (2, 3)]
         """
-        unique_values = np.unique(X[X.notnull()])
+        unique_values = sorted(X)
         return [(unique_values[i], unique_values[i + 1])
                 for i in range(len(unique_values) - 1)]
 
@@ -84,7 +84,7 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         return False
 
     @staticmethod
-    def find_candidate(values: pd.Series, target) -> list:
+    def find_candidate(values: Iterable, target: int) -> list:
         """ Return a list of candidatate values that's next bigger or next smaller than the target value.
             The candidate list will have only one element when the target is the min or max in X.
             ex. find_candidate([1, 2, 3, 0], 2) => [1, 3]
@@ -106,94 +106,96 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         self.discrete_encoding[X.name] = pct_pos
         return X.map(pct_pos)
 
-    def is_monotonic_post_bin(self, X, y):
+    def is_monotonic_post_bin(self, mapping: Dict[int, list]):
         """ Check whether the proportion of positive label is monotonic to bin value"""
-        summary = self.calculate_summary(X, y)
-        pct_pos = summary.sort_values('value')['pct_pos']
-        return self.is_monotonic(pct_pos, self.strict, self.ignore_na)
+        pct_pos = sorted([(k, np.mean(v)) for k, v in mapping.items()])
+        return self.is_monotonic([i[1] for i in pct_pos], self.strict, self.ignore_na)
 
-    def calculate_summary(self, X, y) -> pd.DataFrame:
-        """ Return a summary dataframe that showes the
-            1. chisquare value
-            2. proportion of positive samples
-            for each unique value in X, which will be used for merging bins
-        """
-        pct_pos = []
-        uniq_values = X[X.notnull()].unique()
-        for value in uniq_values:
-            group_label = y[X == value]
-            pct_pos.append(group_label.mean())
+    # def calculate_summary(self, X, y) -> pd.DataFrame:
+    #     """ Return a summary dataframe that showes the
+    #         1. chisquare value
+    #         2. proportion of positive samples
+    #         for each unique value in X, which will be used for merging bins
+    #     """
+    #     pct_pos = []
+    #     uniq_values = X[X.notnull()].unique()
+    #     for value in uniq_values:
+    #         group_label = y[X == value]
+    #         pct_pos.append(group_label.mean())
+    #     return pd.DataFrame({'value': uniq_values, 'pct_pos': pct_pos})
 
-        return pd.DataFrame({'value': uniq_values, 'pct_pos': pct_pos})
-
-    def merge_bin(self, X: pd.Series, replace_value, original_value) -> pd.Series:
+    def merge_bin(self, mapping: Dict[int, list], replace_value, original_value) -> Dict[int, list]:
         """ Replace the smaller value with the bigger one except when the replace value is the
             minimum of X, that case we replace the bigger value with the the smaller one.
-        :param X: The original series.
         """
-        if replace_value == X.min():
-            return X.replace(original_value, replace_value)
+        minimum = min(mapping)
+
+        def _replace(mapping: Dict[int, list], to_replace: int, value: int):
+            mapping[to_replace].extend(mapping[value])
+            del mapping[value]
+            return mapping
+
+        if replace_value == minimum:
+            return _replace(mapping, original_value, replace_value)
+
+        # make sure replace_value is the bigger one
         if replace_value < original_value:
             replace_value, original_value = original_value, replace_value
-        return X.replace(original_value, replace_value)
+        return _replace(mapping, original_value, replace_value)
 
-    def merge_chisquare(self, X, y) -> pd.Series:
+    def merge_chisquare(self, mapping: Dict[int, list], candidates=None) -> Dict[int, list]:
         """ Performs a single merge based on chi square value
             returns a new X' with new groups
+        :param candidates: the candidate values that are allowed to merge, default set to all the values
         """
-        expected_ratio = y.mean()
-        candidate_pairs = self.sorted_two_gram(X)
+        candidates = candidates or mapping.keys()
+        candidate_pairs = self.sorted_two_gram(candidates)
+
         # find the pair with minimum chisquare in one-pass
         min_idx, min_chi2 = 0, np.inf
         for i, pair in enumerate(candidate_pairs):
-            idx = X[X.isin(pair)].index
-            chi2 = self.calculate_chisquare(X[idx], y[idx], expected_ratio)
+            chi2 = self.calculate_chisquare(mapping, pair)
             if chi2 < min_chi2:
                 min_idx, min_chi2 = i, chi2
 
         # replace the smaller value with the bigger one except for the minimum pair
         small, large = candidate_pairs[min_idx]
-        return self.merge_bin(X, small, large)
+        return self.merge_bin(mapping, small, large)
 
-    def merge_purity(self, X: pd.Series, y: pd.Series) -> pd.Series:
+    def merge_purity(self, mapping: Dict[int, list]) -> Tuple[Dict[int, list], bool]:
         """ Performs a single merge trying to merge bins with only 0 or a label into the adjacent mixed label bin
+            Return the updated mapping and a purity label
         """
-        summary = self.calculate_summary(X, y)
-        idx_single_label = summary['pct_pos'] * (1 - summary['pct_pos']) == 0
-        idx_single_label = np.where(idx_single_label)[0]
-        if len(idx_single_label) == 0:
-            return X
-        idx_single_label = idx_single_label[0]
-        value_pure_bin = summary.ix[idx_single_label, 'value']
+        # convert to list so we don't get error modifying dictionary during loop
+        for k in sorted(list(mapping.keys())):
+            pct_pos = np.mean(mapping[k])
 
-        merge_candidates = self.find_candidate(X[X.notnull()].unique(), value_pure_bin)
-        # it merges to the candidate that has mix labels, if both candidates do, then
-        # it will merge to the larger value, if neither does, if will merge both candidates
-        if len(merge_candidates) == 1:
-            return self.merge_bin(X, merge_candidates[0], value_pure_bin)
-        else:
-            left_cand, right_cand = merge_candidates
-            pct_pure_bin = summary.loc[summary['value'] == value_pure_bin, 'pct_pos'].values[0]
-            pct_pos_left = summary.loc[summary['value'] == left_cand, 'pct_pos'].values[0]
-            pct_pos_right = summary.loc[summary['value'] == right_cand, 'pct_pos'].values[0]
+            if pct_pos * (1 - pct_pos) == 0:
+                merge_candidates = self.find_candidate(mapping.keys(), k)
 
-            if 0 < (pct_pos_left + pct_pure_bin) / 2 < 1:
-                return self.merge_bin(X, left_cand, value_pure_bin)
-            elif 0 < (pct_pos_right + pct_pure_bin) / 2 < 1:
-                return self.merge_bin(X, right_cand, value_pure_bin)
-            else:
-            # if both direction can result in mixed label or neither does
-            # merge into the bin that results in smaller chisquare value
-                idx_left = X[X.isin([value_pure_bin, left_cand])].index
-                idx_right = X[X.isin([value_pure_bin, left_cand])].index
-                expected_ratio = y.mean()
-                chi2_left = self.calculate_chisquare(X[idx_left], y[idx_left], expected_ratio)
-                chi2_right = self.calculate_chisquare(X[idx_right], y[idx_right], expected_ratio)
-
-                if chi2_left < chi2_right:
-                    return self.merge_bin(X, left_cand, value_pure_bin)
+                # it merges to the candidate that has mix labels, if both candidates do, then
+                # it will merge to the larger value, if neither does, if will merge both candidates
+                if len(merge_candidates) == 1:
+                    return self.merge_bin(mapping, merge_candidates[0], k), False
                 else:
-                    return self.merge_bin(X, right_cand, value_pure_bin)
+                    left_cand, right_cand = merge_candidates
+                    pct_pos_left = np.mean(mapping[left_cand])
+                    pct_pos_right = np.mean(mapping[right_cand])
+
+                    can_merge_left = 0 < (pct_pos_left + pct_pos) / 2 < 1
+                    can_merge_right = 0 < (pct_pos_right + pct_pos) / 2 < 1
+
+                    if can_merge_left and can_merge_right:
+                        return self.merge_chisquare(mapping, [left_cand, k, right_cand]), False
+                    elif can_merge_left:
+                        return self.merge_bin(mapping, left_cand, k), False
+                    elif can_merge_right:
+                        return self.merge_bin(mapping, right_cand, k), False
+                    else:
+                        mapping = self.merge_bin(mapping, left_cand, k)
+                        return self.merge_bin(mapping, right_cand, k), False
+        else:
+            return mapping, True
 
     def _fit(self, X, y, **fit_parmas):
         """ Fit a single feature and return the cutoff points"""
@@ -211,32 +213,27 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
             X = EFB.fit_transform(X)
             X = make_series(X)
 
-        n_bins = X.nunique() - 1
+        # convert to mapping
+        mapping = y.groupby(X).apply(list).to_dict()
+
+        n_bins = len(mapping) - 1
         # merge bins based on chi square
         while n_bins > self.max_bin:
-            X = self.merge_chisquare(X, y)
-            # TODO: replace nuique() with n_bins -= 1 ??
-            n_bins = X.nunique() - 1
+            mapping = self.merge_chisquare(mapping)
+            n_bins = len(mapping) - 1
 
         # merge bins to create mixed label in every bin
         if self.force_mix_label and n_bins > 1:
-            # loop until the number of bins doesn't change anymore
-            prev_n_bins = n_bins
-            while 1:
-                X = self.merge_purity(X, y)
-                if X.nunique() == prev_n_bins:
-                    break
-                prev_n_bins = X.nunique()
+            is_pure = False
+            while not is_pure:
+                mapping, is_pure = self.merge_purity(mapping)
 
         # merge bins to keep bins to be monotonic
         if self.force_monotonic:
-            while X.nunique() - 1 > 2 and not self.is_monotonic_post_bin(X, y):
-                X = self.merge_chisquare(X, y)
+            while len(mapping) - 1 > 2 and not self.is_monotonic_post_bin(mapping):
+                mapping = self.merge_chisquare(mapping)
 
-        # note here we're adding the min_x and  largest number possible so
-        # even if the transform() encounters values outside of range, we'll still be able to
-        # encode them
-        return np.unique(X[X.notnull()])
+        return list(mapping.keys())
 
     def _transform(self, X: pd.Series, y=None):
         """ Transform a single feature"""
@@ -286,10 +283,10 @@ if __name__ == '__main__':
     y = [0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0]
     X = pd.DataFrame({'a': X, 'b': X, 'c': X})
 
-    X = pd.DataFrame({'a': [random.randint(1, 20) for _ in range(10000)],
-                   'b': [random.randint(1, 20) for _ in range(10000)],
-                 'c': [random.randint(1, 20) for _ in range(10000)]})
-    y = [int(random.random() > 0.5) for _ in range(10000)]
+    X = pd.DataFrame({'a': [random.randint(1, 20) for _ in range(1000)],
+                   'b': [random.randint(1, 20) for _ in range(1000)],
+                 'c': [random.randint(1, 20) for _ in range(1000)]})
+    y = [int(random.random() > 0.5) for _ in range(1000)]
 
     CB = ChiSquareBinning(max_bin=5, categorical_cols=['a'], force_mix_label=False, force_monotonic=False,
                           prebin=100, encode=True, strict=False)
