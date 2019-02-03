@@ -24,8 +24,23 @@ def capture_output():
         out[1] = out[1].getvalue().splitlines()
 
 
-def read_csv(path, **kwargs):
-    """ Read multiple csv files and stack them rowwise."""
-    from glob import glob
-    files = [pd.read_csv(f, **kwargs) for f in glob(path)]
+def read_multiple_files(read_fn, path, **kwargs):
+    from glob import iglob
+    files = [read_fn(f, **kwargs) for f in iglob(path)]
     return pd.concat(files, axis=0)
+
+
+def read_csv(path, **kwargs):
+    """ Read multiple csv file and concatenate them row-wise """
+    return read_multiple_files(pd.read_csv, path, **kwargs)
+
+
+def read_excel(path, **kwargs):
+    """ Read multiple excel file and concatenate them row-wise"""
+    return read_multiple_files(pd.read_excel, path, **kwargs)
+
+
+def read_sheets(path, **kwargs):
+    """ Read all the sheets in an excel file and concatenate them row-wise """
+    sheets = pd.read_excel(path, sheet_name=None)
+    return pd.concat(sheets.values(), axis=0)
