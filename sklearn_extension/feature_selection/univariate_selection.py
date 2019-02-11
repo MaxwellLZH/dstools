@@ -5,11 +5,15 @@ import pandas as pd
 
 def woe(X, y) -> pd.Series:
     """ Return a series mapping feature value to its woe stats"""
-    X, y = make_series(X), make_series(y)
+    y = make_series(y)
     total_pos = y.sum()
     total_neg = len(y) - total_pos
-    pct_pos = (y.groupby(X).sum() + 1) / (total_pos + 1)
-    pct_neg = (y.groupby(X).count() - y.groupby(X).sum() + 1) / (total_neg + 1)
+    grouped = y.groupby(X)
+    grouped_sum = grouped.sum()
+    grouped_count = grouped.count()
+
+    pct_pos = (grouped_sum + 1) / (total_pos + 1)
+    pct_neg = (grouped_count - grouped_sum + 1) / (total_neg + 1)
 
     with np.errstate(invalid='ignore', divide='ignore'):
         woe_value = np.log(pct_pos / pct_neg)
@@ -18,11 +22,15 @@ def woe(X, y) -> pd.Series:
 
 def _iv(X, y) -> float:
     """ Calulate the iv value for a single feature"""
-    X, y = make_series(X), make_series(y)
+    y = make_series(y)
     total_pos = y.sum()
     total_neg = len(y) - total_pos
-    pct_pos = (y.groupby(X).sum() + 1) / (total_pos + 1)
-    pct_neg = (y.groupby(X).count() - y.groupby(X).sum() + 1) / (total_neg + 1)
+    grouped = y.groupby(X)
+    grouped_sum = grouped.sum()
+    grouped_count = grouped.count()
+
+    pct_pos = (grouped_sum + 1) / (total_pos + 1)
+    pct_neg = (grouped_count - grouped_sum + 1) / (total_neg + 1)
 
     with np.errstate(invalid='ignore', divide='ignore'):
         woe = np.log(pct_pos / pct_neg)
