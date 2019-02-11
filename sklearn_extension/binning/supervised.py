@@ -50,7 +50,8 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         count = {k: len(v) for k, v in mapping.items()}
         actual_pos = {k: sum(v) for k, v in mapping.items()}
         actual_neg = {k: (count[k] - actual_pos[k]) for k in candidates}
-        expected_ratio = sum(actual_pos.values()) / sum(count.values())
+
+        expected_ratio = self.expected_ratio
         expected_pos = {k: v * expected_ratio for k, v in count.items()}
         expected_neg = {k: (count[k] - expected_pos[k]) for k in candidates}
 
@@ -217,6 +218,15 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
 
         # convert to mapping
         mapping = y.groupby(X).apply(list).to_dict()
+
+        # set the overall expected ratio
+        if len(mapping) == 0:
+            return list()
+        self.expected_ratio = sum(sum(v) for v in mapping.values()) / sum(len(v) for v in mapping.values())
+        # if the expected_ratio is 0 or 1 there should be only 1 group and
+        # any not-null value will be encoded into 0
+        if self.expected_ratio == 0 or self.expected_ratio == 1:
+            return [np.inf]
 
         n_bins = len(mapping) - 1
         # merge bins based on chi square
