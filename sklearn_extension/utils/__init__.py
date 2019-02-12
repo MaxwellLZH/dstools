@@ -51,12 +51,23 @@ def searchsorted(a, v, fill=-1):
 
 
 def assign_group(x, bins):
-    """ Assign the right cutoff value for each value in x given the bins
+    """ Assign the right cutoff value for each value in x except for the first interval
+        which take the left cutoff value
+        ex. assign_group(range(6), [0, 2, 4]) => [0, 0, 0, 4, 4, np.inf]
     """
     # add infinite at the end
     extended_cutoff = list(bins) + [np.inf]
-    return [v if np.isnan(v) else extended_cutoff[_searchsorted(extended_cutoff, v)] \
-                                                 for v in x]
+    groups = list()
+    for v in x:
+        if np.isnan(v):
+            groups.append(v)
+        else:
+            idx = _searchsorted(extended_cutoff, v)
+            if idx <= 1:
+                groups.append(extended_cutoff[0])
+            else:
+                groups.append(extended_cutoff[idx])
+    return groups
 
 
 def wrap_with_inf(bins):
