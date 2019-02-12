@@ -252,11 +252,12 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         if not self.bins:
             raise NotFittedError('This ChiSquareBinner is not fitted. Call the fit method first.')
 
-        # map discrete value to the positive proportion
+        # map discrete value to its corresponding percentage of positive samples
         col_name = X.name
         if col_name not in self.bins:
             raise ValueError('Column {} does\'t exist during fit().'.format(col_name))
         if col_name in self.categorical_cols:
+            # if the a new category is encountered, leave it as missing
             X = X.map(self.discrete_encoding[col_name])
 
         if self.encode:

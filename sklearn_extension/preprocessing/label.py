@@ -4,6 +4,7 @@ from sklearn.utils.validation import check_is_fitted
 import pandas as pd
 
 from ..feature_selection import woe
+from ..utils import encode_with_nearest_key
 
 
 class WoeEncoder(BaseEstimator, TransformerMixin):
@@ -26,8 +27,9 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         self.cols = self.cols or X.columns
 
         for col in self.cols:
-            self.mapping_[col] = woe(X[col], y).to_dict()
-            self.inverse_mapping_[col] = {v: k for k, v in self.mapping_[col].items()}
+            woe_value = woe(X[col], y)
+            self.mapping_[col] = woe_value
+            self.inverse_mapping_[col] = pd.Series(woe_value.index, woe_value.values)
         return self
 
     def transform(self, X: pd.DataFrame, y=None):
@@ -37,7 +39,8 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
             if col not in self.mapping_:
                 raise ValueError('Column {} not seen during the fit() process.'.format(col))
             # TODO: Better way to deal with values that didn't appear in the fit() process
-            x[col] = x[col].map(self.mapping_[col]).fillna(0)
+            # if value didn't appear in the fit() process find the nearest value for it
+            x[col] = x[col].map(lambda x: encode_with_nearest_key(self.mapping_[col], x))
         return x
 
     def inverse_transform(self, X: pd.DataFrame, y=None):

@@ -65,3 +65,21 @@ def wrap_with_inf(bins):
      """
     return np.unique(list(bins) + [np.inf, -np.inf])
 
+
+def encode_with_nearest_key(series: pd.Series, key):
+    """ Find the value with the nearest key to the given new key value
+        Only works when the series has a numerical index
+    """
+    try:
+        return series[key]
+    except KeyError:
+        nearest_key_idx = np.abs((series.index - key)).argmin()
+        return series[series.index[nearest_key_idx]]
+
+
+def encode_with_default_value(series: pd.Series, key, default=0):
+    """ Find the value in Pandas Series with default value"""
+    try:
+        return series[key]
+    except KeyError:
+        return default
