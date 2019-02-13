@@ -206,9 +206,9 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
             return list()
         self.expected_ratio = sum(sum(v) for v in mapping.values()) / sum(len(v) for v in mapping.values())
         # if the expected_ratio is 0 or 1 there should be only 1 group and
-        # any not-null value will be encoded into 0
+        # any not-null value will be encoded into 1
         if self.expected_ratio == 0 or self.expected_ratio == 1:
-            return [np.inf]
+            return [-np.inf]
 
         n_bins = len(mapping) - 1
         # merge bins based on chi square
