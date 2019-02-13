@@ -92,6 +92,10 @@ def return_default(criteria=None, default_value=None):
     return decorator
 
 
+# na_return_default = functools.partial(return_default, criteria=is_scalar_nan)
+# na_set_default = functools.partial(set_default, criteria=is_scalar_nan)
+
+
 def flatten_list(nested_list):
     """ Flatten a nested list regardless of the depth."""
     flattened_list = list()
@@ -103,5 +107,11 @@ def flatten_list(nested_list):
     return flattened_list
 
 
-# na_return_default = functools.partial(return_default, criteria=is_scalar_nan)
-# na_set_default = functools.partial(set_default, criteria=is_scalar_nan)
+def find_duplicates(iterable, min_count=1, with_count=True):
+    """ Find duplicate elements in an iterable"""
+    from collections import Counter
+    counter = Counter(iterable)
+    if with_count:
+        return [k for k, v in counter.items() if v > min_count]
+    else:
+        return [(k, v) for k, v in counter.items() if v > min_count]
