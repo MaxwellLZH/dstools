@@ -95,11 +95,6 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         cnt = len(values)
         return [values[i] for i in [idx - 1, idx + 1] if 0 <= i < cnt]
 
-    # def maybe_save_summary(self, X, y):
-    #     # save the summary table if needed
-    #     if self.keep_history:
-    #         self.history_summary.append(self.calculate_summary(X, y))
-
     def encode_with_label(self, X: pd.Series, y: pd.Series) -> pd.Series:
         """ Encode categorical features with its percentage of positive samples"""
         X, y = make_series(X), make_series(y)
@@ -112,19 +107,6 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         """ Check whether the proportion of positive label is monotonic to bin value"""
         pct_pos = sorted([(k, np.mean(v)) for k, v in mapping.items()])
         return self.is_monotonic([i[1] for i in pct_pos], self.strict, self.ignore_na)
-
-    # def calculate_summary(self, X, y) -> pd.DataFrame:
-    #     """ Return a summary dataframe that showes the
-    #         1. chisquare value
-    #         2. proportion of positive samples
-    #         for each unique value in X, which will be used for merging bins
-    #     """
-    #     pct_pos = []
-    #     uniq_values = X[X.notnull()].unique()
-    #     for value in uniq_values:
-    #         group_label = y[X == value]
-    #         pct_pos.append(group_label.mean())
-    #     return pd.DataFrame({'value': uniq_values, 'pct_pos': pct_pos})
 
     def merge_bin(self, mapping: Dict[int, list], replace_value, original_value) -> Dict[int, list]:
         """ Replace the smaller value with the bigger one except when the replace value is the
@@ -244,6 +226,9 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         if self.force_monotonic:
             while len(mapping) - 1 > 2 and not self.is_monotonic_post_bin(mapping):
                 mapping = self.merge_chisquare(mapping)
+
+        # clean up the cache
+        self._chisquare_cache = dict()
 
         return sorted(mapping.keys())
 
