@@ -203,7 +203,8 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
 
         # set the overall expected ratio
         if len(mapping) == 0:
-            return list()
+            return [-np.inf]
+
         self.expected_ratio = sum(sum(v) for v in mapping.values()) / sum(len(v) for v in mapping.values())
         # if the expected_ratio is 0 or 1 there should be only 1 group and
         # any not-null value will be encoded into 1
