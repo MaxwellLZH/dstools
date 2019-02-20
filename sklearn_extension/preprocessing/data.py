@@ -231,7 +231,6 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
         return x
 
 
-
 class CorrelationRemover(BaseEstimator, TransformerMixin):
 
     def __init__(self, cols=None, categorical_cols=None, threshold=0.8, method='pearson', save_corr=False):
@@ -247,9 +246,26 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
         self.threshold = threshold
         self.method = method
         self.save_corr = save_corr
-        self.mat_corr = None
+        self.num_corr_mat = None
+        self.cat_corr_mat = None
 
         self.drop_cols = None
+
+    @staticmethod
+    def cat_corr_matrix(X):
+        n = X.shape[1]
+        col_names = X.columns.tolist()
+        corr_mat = np.empty((n, n))
+        
+        def cat_corr(s1: pd.Series, s2: pd.Series):
+            return (s1.fillna('_MISSING_')==s2.fillna('_MISSING_')).mean()
+        
+        for i in range(n):
+            for j in range(i+1):
+                if i == j:
+                    corr_mat[i][j] = 1
+                corr_mat[i][j] = corr_mat[j][i] = cat_corr(X[col_names[i]], X[col_names[j]])
+        return pd.DataFrame(corr_mat, index=col_names, columns=col_names)
 
     def fit(self, X, y=None, **fit_params):
         """ Return the number of dropped columns """
@@ -259,31 +275,47 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
             raise ValueError('The following columns are does not exist in DataFrame X: ' +
                              repr(list(_error_cols)))
 
-        numerical_cols = list(set(X.select_dtypes(include='number')) - set(self.categorical_cols))
-        if len(numerical_cols)==0:
-            return self
+        numerical_cols = list(set(cols) - set(self.categorical_cols))
+        # make sure the categorical column actually exist in DataFrame X
+        categorical_cols = self.categorical_cols or X.select_dtypes(include=['object']).columns.tolist()
+        categorical_cols = [c for c in categorical_cols if c in cols]
+        self.categorical_cols = categorical_cols
 
-        mat_corr = X[numerical_cols].corr(method=self.method).abs()
-        if self.save_corr:
-            self.mat_corr = mat_corr
-            
         self.drop_cols = list()
-        for i, c_a in enumerate(cols):
-            for j in range(i+1, len(cols)):
-                c_b = cols[j]
-                if c_b in numerical_cols and \
-                    c_b not in self.drop_cols and \
-                    mat_corr.loc[c_a, c_b] > self.threshold:
-                        self.drop_cols.append(c_b)
+
+        if numerical_cols:
+            num_corr_mat = X[numerical_cols].corr(method=self.method).abs()
+            
+            for i, c_a in enumerate(numerical_cols):
+                for j in range(i+1, len(numerical_cols)):
+                    c_b = numerical_cols[j]
+                    if c_b not in self.drop_cols and \
+                        num_corr_mat.loc[c_a, c_b] > self.threshold:
+                            self.drop_cols.append(c_b)
+            if self.save_corr:
+                self.num_corr_mat = num_corr_mat
+
+        if categorical_cols:
+            cat_corr_mat = self.cat_corr_matrix(X[categorical_cols]).abs()
+            
+            for i, c_a in enumerate(categorical_cols):
+                for j in range(i+1, len(categorical_cols)):
+                    c_b = categorical_cols[j]
+                    if c_b not in self.drop_cols and \
+                        cat_corr_mat.loc[c_a, c_b] > self.threshold:
+                            self.drop_cols.append(c_b)
         
+            if self.save_corr:
+                self.cat_corr_mat = cat_corr_mat
+                        
+        self.keep_cols = [c for c in cols if c not in self.drop_cols]
         return self
 
     def transform(self, X, y=None):
         if self.drop_cols is None:
             raise NotFittedError('This CorrelationRemover is not fitted. Call the fit method first.')
-
-        drop_cols = set(X.columns) & set(self.drop_cols)
-        return X.drop(drop_cols, axis=1)
+        # drop_cols = set(X.columns) & set(self.drop_cols)
+        return X[self.keep_cols]
 
 
 
