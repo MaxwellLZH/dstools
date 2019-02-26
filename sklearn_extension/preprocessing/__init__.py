@@ -6,5 +6,6 @@ __all__ = [
     'NormDistOutlierRemover',
     'IQROutlierRemover',
     'QuantileOutlierRemover',
-    'OrdinalEncoder'
+    'OrdinalEncoder',
+    'CorrelationRemover'
 ]

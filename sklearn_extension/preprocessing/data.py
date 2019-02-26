@@ -1,11 +1,12 @@
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils.validation import check_is_fitted, assert_all_finite
+from scipy.stats import skew    
 import pandas as pd
 import numpy as np
 import warnings
 
-from sklearn.utils import check_array
-from sklearn.utils import column_or_1d
+
+from sklearn.utils import check_array, column_or_1d
+from sklearn.utils.validation import check_is_fitted
 
 
 def _encode_python(values, uniques=None, encode=False, unseen='warn'):
@@ -130,50 +131,52 @@ class IQROutlierRemover(BaseEstimator, TransformerMixin):
 
 
 class QuantileOutlierRemover(BaseEstimator, TransformerMixin):
-    """ Removing outlier when it's above or below a certain quantile,
-    """
-    def __init__(self, quantile=0.95, upper=True, cols=None, interpolation='nearest', error='warn'):
+    """ Removing outlier based on skewness threshold """
+    
+    def __init__(self, skewness_threshold=0.8, outlier_quantile=0.1, cols=None, interpolation='nearest', error='warn'):
         """
-        :param quantile: The quantile above or below which should be considered outlier
-        :param upper: The upper or lower end to be considered as outlier
+        :param skewness_threshold: the skewness limit above or below which 
+        :param outlier_quantile: the percentage of data to be treated as outlier
         :param interpolation: interpolation used in calculating the quantile
-        :param cols: A list of column names to apply transformations, default for all the columns
+        :param cols: A list of column names to apply transformations, default for all the numerical columns
         :param error: Specify the action when the DataFrame passed to transform doesn't have all the columns,
             supported actions are ['raise', 'ignore', 'warn']
         """
-        self.quantile = quantile
-        self.upper = upper
+        self.skewness_threshold = skewness_threshold
+        self.outlier_quantile = outlier_quantile
         self.interpolation = interpolation
-        if isinstance(cols, str):
-            self.cols = [cols]
-        else:
-            self.cols = cols
+        self.cols = cols
         self.error = error
 
+        self.upper_threshold = None
+        self.lower_threshold = None
+
     def fit(self, X: pd.DataFrame, y=None):
-        X = X[self.cols] if self.cols else X
-        self.cols = self.cols or X.columns
-        self.threshold = X.quantile(self.quantile, interpolation=self.interpolation)
+        self.cols = cols = self.cols or X.select_dtypes(include='number').columns.tolist()
+        self.skewness = skewness = pd.Series(skew(X[cols]), index=cols)
+        self.pos_skew_cols = pos_skew_cols = skewness[skewness > self.skewness_threshold].index.tolist()
+        self.neg_skew_cols = neg_skew_cols = skewness[skewness < -self.skewness_threshold].index.tolist()
+
+        if self.pos_skew_cols:
+            self.upper_threshold = upper_threshold = X[pos_skew_cols].quantile(1-self.outlier_quantile, 
+                                                                               interpolation=self.interpolation)
+        if self.neg_skew_cols:
+            self.lower_threshold = lower_threshold = X[neg_skew_cols].quantile(self.outlier_quantile, 
+                                                                               interpolation=self.interpolation)
         return self
-
+    
     def transform(self, X: pd.DataFrame, y=None):
-        check_is_fitted(self, 'threshold')
-        threshold = self.threshold
-        x = X.copy()
-        for col in self.cols:
-            if col not in x:
-                msg = 'Column {} is not found in the DataFrame'.format(col)
-                if self.error == 'raise':
-                    raise ValueError(msg)
-                if self.error == 'warn':
-                    warnings.warn(msg)
-
-            th = threshold[col]
-            if self.upper:
-                x.loc[x[col] > th, col] = th
-            else:
-                x.loc[x[col] < th, col] = th
-        return x
+        check_is_fitted(self, 'pos_skew_cols')
+        X = X.copy()
+        pos_skew_cols = [c for c in X.columns if c in self.pos_skew_cols]
+        neg_skew_cols = [c for c in X.columns if c in self.neg_skew_cols]
+        
+        upper_threshold, lower_threshold = self.upper_threshold, self.lower_threshold
+        for col in pos_skew_cols:
+            X.loc[X[col] > upper_threshold[col], col] = upper_threshold[col]
+        for col in neg_skew_cols:
+            X.loc[X[col] < lower_threshold[col], col] = lower_threshold[col]
+        return X
 
 
 class OrdinalEncoder(BaseEstimator, TransformerMixin):
@@ -272,7 +275,7 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
         self.cols = cols = self.cols or X.columns.tolist()
         _error_cols = set(cols) - set(X.columns)
         if _error_cols:
-            raise ValueError('The following columns are does not exist in DataFrame X: ' +
+            raise ValueError('The following columns does not exist in DataFrame X: ' +
                              repr(list(_error_cols)))
 
         numerical_cols = list(set(cols) - set(self.categorical_cols))
