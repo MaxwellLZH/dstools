@@ -21,10 +21,8 @@ class EqualWidthBinning(Binning):
             If the input has missing values, it will be put under a seperate group with the largest bin value
         :param fill: Used to fill in missing value.
         """
-        super().__init__(bins)
+        super().__init__(bins, encode, fill)
         self.n = n
-        self.encode = encode
-        self.fill = fill
 
     def _fit(self, X: pd.Series, y=None, **fit_parmas):
         """ Fit a single feature and return the cutoff points"""
@@ -40,15 +38,6 @@ class EqualWidthBinning(Binning):
         bins = [find_nearest_element(X_, elem) for elem in np.linspace(v_min, v_max, self.n+1)]
         return bins
 
-    def _transform(self, X: pd.Series, y=None):
-        col_name = X.name
-        binned = assign_group(X, self.bins[col_name])
-
-        if self.encode:
-            return searchsorted(self.bins[col_name], binned, self.fill)
-        else:
-            return binned
-
 
 class EqualFrequencyBinning(Binning):
 
@@ -63,10 +52,8 @@ class EqualFrequencyBinning(Binning):
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
         :param fill: Used to fill in missing value.
         """
-        super().__init__(bins)
+        super().__init__(bins, encode, fill)
         self.n = n
-        self.encode = encode
-        self.fill = fill
 
     def _fit(self, X: pd.Series, y=None, **fit_parmas):
         """ Fit a single feature and return the cutoff points"""
@@ -76,15 +63,6 @@ class EqualFrequencyBinning(Binning):
         quantiles = np.linspace(0, len(X[X.notnull()]) - 1, self.n+1, dtype=int)
         cutoff = X.sort_values().reset_index(drop=True)[quantiles]
         return cutoff
-
-    def _transform(self, X: pd.Series, y=None):
-        col_name = X.name
-        binned = assign_group(X, self.bins[col_name])
-
-        if self.encode:
-            return searchsorted(self.bins[col_name], binned, self.fill)
-        else:
-            return binned
 
 
 def equal_width_binning(X: pd.Series, n: int, encode: bool = True, fill: int = -1):

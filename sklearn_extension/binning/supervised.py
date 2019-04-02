@@ -37,12 +37,10 @@ class ChiSquareBinning(Binning):
         :param ignore_na: The monotonicity check will ignore missing value
         :param prebin: An integer, number of bins to split into before the chimerge process.
         """
-        super().__init__(bins)
+        super().__init__(bins, encode, fill)
         self.max_bin = max_bin
         self.categorical_cols = categorical_cols or []
         self.bin_cat_cols = bin_cat_cols
-        self.encode = encode
-        self.fill = fill
         self.force_monotonic = force_monotonic
         self.force_mix_label = force_mix_label
         self.strict = strict

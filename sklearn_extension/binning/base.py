@@ -1,15 +1,25 @@
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
+from ..utils import searchsorted, assign_group
 
 
 class Binning(BaseEstimator, TransformerMixin):
     """ Base class for all Binning functionalities,
         Subclasses should overwrite the _fit and _transform method for their own purporses.
     """
-    def __init__(self, bins=None):
-        """ bins is a dictionary mapping column names to its cutoff points"""
-        self.bins = bins or dict()
+    def __init__(self,
+                 bins=None,
+                 encode: bool = True,
+                 fill: int = -1):
+        """ bins is a dictionary mapping column names to its cutoff points
+        :param encode: If set to False, the result of transform will be right cutoff point of the interval
+        :param fill: Used to fill in missing value.
+
+        """
+        self.bins = bins
+        self.encode = encode
+        self.fill = fill
 
     def _fit(self, X, y, **fit_parmas):
         """ Fit a single feature and return the cutoff points or None,
@@ -19,7 +29,13 @@ class Binning(BaseEstimator, TransformerMixin):
 
     def _transform(self, X, y=None):
         """ Transform a single feature"""
-        raise NotImplementedError
+        col_name = X.name
+        binned = assign_group(X, self.bins[col_name])
+
+        if self.encode:
+            return searchsorted(self.bins[col_name], binned, self.fill)
+        else:
+            return binned
 
     def fit(self, X: pd.DataFrame, y=None, **fit_params):
         """
