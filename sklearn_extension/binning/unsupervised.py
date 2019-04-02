@@ -1,102 +1,118 @@
 """ Implements the equal width and equal frequency binning """
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.exceptions import NotFittedError
 import pandas as pd
 import numpy as np
 import warnings
+from pandas.api.types import is_numeric_dtype
 
 from ..utils import searchsorted, wrap_with_inf, assign_group, make_series
+from .base import Binning
 
 
-class EqualWidthBinning(BaseEstimator, TransformerMixin):
-    """ A wrapper for Pandas.cut, the only difference is it returns the
-     encoded feature rather than a categorical series
-     """
-    def __init__(self, n, bins=None, encode=True, fill=-1,
-                 right=True, include_lowest=False, duplicates='raise'):
+class EqualWidthBinning(Binning):
+    def __init__(self,
+                 n: int,
+                 bins: dict = None,
+                 encode: bool = True,
+                 fill: int = -1):
         """
         :param n: Number of bins to split into
-        :param bins: A series of cutoff point.
+        :param bins: A dictionary mapping column name to cutoff points
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
             If the input has missing values, it will be put under a seperate group with the largest bin value
         :param fill: Used to fill in missing value.
         """
+        super().__init__(bins)
         self.n = n
-        self.bins = bins
         self.encode = encode
         self.fill = fill
-        self.right = right
-        self.include_lowest = include_lowest
-        self.duplicates = duplicates
 
-    def fit(self, X, y=None, **fit_params):
-        if self.bins is not None:
-            warnings.warn('The binner has already be fitted. '
-                          'Calling the fit method will refit the binner.')
-        _, bins = pd.cut(X, self.n, right=self.right, retbins=True,
-                              include_lowest=self.include_lowest,
-                              duplicates=self.duplicates)
-        self.bins = wrap_with_inf(bins)
-        return self
+    def _fit(self, X: pd.Series, y=None, **fit_parmas):
+        """ Fit a single feature and return the cutoff points"""
+        if not is_numeric_dtype(X):
+            return None
 
-    def transform(self, X, y=None):
-        if self.bins is None:
-            raise NotFittedError('This EqualWidthBinner is not fitted. Call the fit method first.')
-        binned = pd.cut(X, self.bins, right=self.right,
-                        include_lowest=self.include_lowest,
-                        duplicates=self.duplicates)
-        binned = [i if i is np.nan else i.right for i in binned]
+        def find_nearest_element(series, elem):
+            min_idx = (series - elem).abs().values.argmin()
+            return series.iloc[min_idx]
+
+        X_ = X[X.notnull()]
+        v_min, v_max = X_.min(), X_.max()
+        bins = [find_nearest_element(X_, elem) for elem in np.linspace(v_min, v_max, self.n+1)]
+        return bins
+
+    def _transform(self, X: pd.Series, y=None):
+        col_name = X.name
+        binned = assign_group(X, self.bins[col_name])
 
         if self.encode:
-            return searchsorted(self.bins, binned, self.fill)
+            return searchsorted(self.bins[col_name], binned, self.fill)
         else:
             return binned
 
 
-class EqualFrequencyBinning(BaseEstimator, TransformerMixin):
-    """ A wrapper for Pandas.qcut"""
-    def __init__(self, n, bins=None, outlier_pct=1.0, encode=True, fill=-1, duplicates='raise'):
+class EqualFrequencyBinning(Binning):
+
+    def __init__(self,
+                 n: int,
+                 bins: dict = None,
+                 encode: bool = True,
+                 fill: int = -1):
         """
         :param q: Number of equal width intervals to split into
         :param bins: A series of cutoff points, if provided, n will be ignored
-        :param outlier_pct: The quantity percentage above which all the values will be in the same group
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
         :param fill: Used to fill in missing value.
         """
+        super().__init__(bins)
         self.n = n
-        self.bins = bins
-        self.outlier_pct = outlier_pct
         self.encode = encode
         self.fill = fill
-        self.duplicates = duplicates
 
-    def fit(self, X, y=None, **fit_params):
-        X = make_series(X)
-        if self.bins is not None:
-            warnings.warn('The binner has already be fitted. '
-                          'Calling the fit method will refit the binner.')
-        # _, bins = pd.qcut(X, self.n, retbins=True, duplicates=self.duplicates)
-        quantiles = np.linspace(0, len(X[X.notnull()]) * self.outlier_pct - 1, self.n, dtype=int)
+    def _fit(self, X: pd.Series, y=None, **fit_parmas):
+        """ Fit a single feature and return the cutoff points"""
+        if not is_numeric_dtype(X):
+            return None
+
+        quantiles = np.linspace(0, len(X[X.notnull()]) - 1, self.n+1, dtype=int)
         cutoff = X.sort_values().reset_index(drop=True)[quantiles]
-        self.bins = cutoff.values
-        return self
+        return cutoff
 
-    def transform(self, X, y=None):
-        if self.bins is None:
-            raise NotFittedError('This EqualFrequencyBinner is not fitted. Call the fit method first.')
-        binned = assign_group(X, self.bins)
+    def _transform(self, X: pd.Series, y=None):
+        col_name = X.name
+        binned = assign_group(X, self.bins[col_name])
 
         if self.encode:
-            return searchsorted(self.bins, binned, self.fill)
+            return searchsorted(self.bins[col_name], binned, self.fill)
         else:
             return binned
 
 
+def equal_width_binning(X: pd.Series, n: int, encode: bool = True, fill: int = -1):
+    """ Shortcut for equal width binning on a Pandas.Series, returns
+        the encoded series and the cutoff points
+    """
+    s_name = X.name or 0
+    EWB = EqualWidthBinning(n, encode=encode, fill=fill)
+    binned = EWB.fit_transform(X.to_frame())
+    return binned[s_name], EWB.bins[s_name]
+
+
+def equal_frequency_binning(X: pd.Series, n: int, encode: bool = True, fill: int = -1):
+    """ Shortcut for equal frequency binning on a Pandas.Series, returns
+        the encoded series and the cutoff points
+    """
+    s_name = X.name or 0
+    EFB = EqualFrequencyBinning(n, encode=encode, fill=fill)
+    binned = EFB.fit_transform(X.to_frame())
+    return binned[s_name], EFB.bins[s_name]
+
+
 if __name__ == '__main__':
-    s = pd.Series(list(range(20)) + [np.nan] * 4)
-    EWB = EqualWidthBinning(n=5, encode=True)
-    EFB = EqualFrequencyBinning(n=5, encode=False)
-    print(EFB.fit_transform(s))
-    print(EFB.bins)
-    print(EFB.transform(s))
+    # s = pd.Series(list(range(20)) + [np.nan] * 4)
+    # EWB = EqualWidthBinning(n=5, encode=True)
+    # EFB = EqualFrequencyBinning(n=5, encode=False)
+    # print(EFB.fit_transform(s))
+    # print(EFB.bins)
+    # print(EFB.transform(s))
+    pass
 

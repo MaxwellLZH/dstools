@@ -1,21 +1,33 @@
-from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 import numpy as np
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, Tuple, List
 
 from ..utils import force_zero_one, make_series, searchsorted, assign_group
-from ..binning.unsupervised import EqualFrequencyBinning
+from .base import Binning
+from .unsupervised import equal_frequency_binning
 
 
-class ChiSquareBinning(BaseEstimator, TransformerMixin):
+class ChiSquareBinning(Binning):
 
-    def __init__(self, max_bin, categorical_cols=None, encode=True, fill=-1,
-                 force_monotonic=True, force_mix_label=True,
-                 strict=True, ignore_na=True, prebin=100):
+    def __init__(self,
+                 max_bin: int,
+                 bins: dict = None,
+                 categorical_cols: List[str] = None,
+                 bin_cat_cols: bool = True,
+                 encode: bool = True,
+                 fill: int = -1,
+                 force_monotonic: bool = True,
+                 force_mix_label: bool = True,
+                 strict: bool = True,
+                 ignore_na: bool = True,
+                 prebin: int = 100):
         """
         :param max_bin: The number of bins to split into
+        :param bins: A dictionary mapping column name to cutoff points
         :param categorical_cols: A list of categorical columns
+        :param bin_cat_cols: Whether to perform binning on categorical columns
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
         :param fill: Label for missing value
         :param force_monotonic:  Whether to force the bins to be monotonic with the
@@ -25,20 +37,19 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
         :param ignore_na: The monotonicity check will ignore missing value
         :param prebin: An integer, number of bins to split into before the chimerge process.
         """
+        super().__init__(bins)
         self.max_bin = max_bin
         self.categorical_cols = categorical_cols or []
+        self.bin_cat_cols = bin_cat_cols
         self.encode = encode
         self.fill = fill
         self.force_monotonic = force_monotonic
         self.force_mix_label = force_mix_label
         self.strict = strict
         self.ignore_na = ignore_na
-        # A dictionary mapping column name to its encoding
+        # mapping for discrete variables
         self.discrete_encoding = dict()
-        # A dictionary mapping column name to its cutoff points
-        self.bins = dict()
         self.prebin = prebin
-
         self._chisquare_cache = dict()
 
     def calculate_chisquare(self, mapping: Dict[int, list], candidates: Iterable) -> float:
@@ -183,19 +194,25 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
 
     def _fit(self, X, y, **fit_parmas):
         """ Fit a single feature and return the cutoff points"""
+        if not is_numeric_dtype(X) and X.name not in self.categorical_cols:
+            raise ValueError('Column {} is not numeric and not in categorical_cols.'.format(X.name))
+
         y = force_zero_one(y)
         y = make_series(y)
 
         # if X is discrete, encode with positive ratio in y
         if X.name in self.categorical_cols:
+            # the categorical columns will remain unchanged if
+            # we turn of  bin_cat_cols
+            if not self.bin_cat_cols:
+                return None
             X = self.encode_with_label(X, y)
 
         # the number of bins is the number of cutoff points minus 1
         n_bins = X.nunique() - 1
         # speed up the process with prebinning
         if self.prebin and n_bins > self.prebin:
-            EFB = EqualFrequencyBinning(n=self.prebin, encode=False)
-            X = EFB.fit_transform(X)
+            X, _ = equal_frequency_binning(X, n=self.prebin, encode=False)
             # X = make_series(X)
 
         # convert to mapping
@@ -230,18 +247,12 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
 
         # clean up the cache
         self._chisquare_cache = dict()
-
-        return sorted(mapping.keys())
+        return mapping.keys()
 
     def _transform(self, X: pd.Series, y=None):
         """ Transform a single feature"""
-        if not self.bins:
-            raise NotFittedError('This ChiSquareBinner is not fitted. Call the fit method first.')
-
         # map discrete value to its corresponding percentage of positive samples
         col_name = X.name
-        if col_name not in self.bins:
-            raise ValueError('Column {} does\'t exist during fit().'.format(col_name))
         if col_name in self.categorical_cols:
             # if the a new category is encountered, leave it as missing
             X = X.map(self.discrete_encoding[col_name])
@@ -250,27 +261,6 @@ class ChiSquareBinning(BaseEstimator, TransformerMixin):
             return searchsorted(self.bins[col_name], X, self.fill)
         else:
             return assign_group(X, self.bins[col_name])
-
-    def fit(self, X: pd.DataFrame, y: pd.Series, **fit_params):
-        """
-        :param X: Pandas DataFrame with shape (n_sample, n_feature)
-        :param y: a label column with shape (n_sample, )
-        """
-        # check if any of the string type columns is not in category_cols list
-        _error_cols = set(X.select_dtypes('O').columns) - set(self.categorical_cols)
-        if _error_cols:
-            raise ValueError('The following columns are string but not included in the categorical_col: ' +
-                             repr(list(_error_cols)))
-
-        for col in X.columns:
-            self.bins[col] = self._fit(X[col], y)
-        return self
-
-    def transform(self, X: pd.DataFrame, y=None):
-        x = X.copy()
-        for col in x.columns:
-            x[col] = self._transform(x[col])
-        return x
 
 
 if __name__ == '__main__':
