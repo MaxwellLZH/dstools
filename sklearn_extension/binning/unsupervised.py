@@ -62,7 +62,8 @@ class EqualFrequencyBinning(Binning):
 
         quantiles = np.linspace(0, len(X[X.notnull()]) - 1, self.n+1, dtype=int)
         cutoff = X.sort_values().reset_index(drop=True)[quantiles]
-        return cutoff
+        # there might be duplicated cutoff points
+        return set(cutoff)
 
 
 def equal_width_binning(X: pd.Series, n: int, encode: bool = True, fill: int = -1):

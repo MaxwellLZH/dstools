@@ -2,6 +2,7 @@ from sklearn.exceptions import NotFittedError
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 import numpy as np
+from collections import defaultdict
 from typing import Dict, Iterable, Tuple, List
 
 from ..utils import force_zero_one, make_series, searchsorted, assign_group
@@ -121,20 +122,19 @@ class ChiSquareBinning(Binning):
         """ Replace the smaller value with the bigger one except when the replace value is the
             minimum of X, that case we replace the bigger value with the the smaller one.
         """
-        minimum = min(mapping)
-
         def _replace(mapping: Dict[int, list], to_replace: int, value: int):
             mapping[value].extend(mapping[to_replace])
             del mapping[to_replace]
             return mapping
 
-        if replace_value == minimum:
-            return _replace(mapping, original_value, replace_value)
-
         # make sure replace_value is the bigger one
         if replace_value < original_value:
             replace_value, original_value = original_value, replace_value
-        return _replace(mapping, original_value, replace_value)
+
+        if original_value == min(mapping):
+            return _replace(mapping, replace_value, original_value)
+        else:
+            return _replace(mapping, original_value, replace_value)
 
     def merge_chisquare(self, mapping: Dict[int, list], candidates=None) -> Dict[int, list]:
         """ Performs a single merge based on chi square value
@@ -259,6 +259,26 @@ class ChiSquareBinning(Binning):
             return searchsorted(self.bins[col_name], X, self.fill)
         else:
             return assign_group(X, self.bins[col_name])
+
+    def get_interval_mapping(self, col_name: str):
+        """ Get the mapping from encoded value to its corresponding group. """
+        if self.bins is None:
+            raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
+
+        if col_name not in self.bins:
+            raise ValueError('Column {} was not seen during the fit process'.format(col_name))
+
+        if col_name not in self.categorical_cols:
+            return super().get_interval_mapping(col_name)
+
+        # categorical column
+        encoding = self.discrete_encoding[col_name]
+        group = defaultdict(list)
+        for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
+            group[i].append(v)
+        group = {k: ', '.join(v) for k, v in group.items()}
+        group[0] = 'UNSEEN'
+        return group
 
 
 if __name__ == '__main__':

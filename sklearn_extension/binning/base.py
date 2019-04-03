@@ -57,3 +57,23 @@ class Binning(BaseEstimator, TransformerMixin):
             if self.bins.get(col, None) is not None:
                 x[col] = self._transform(x[col])
         return x
+
+    def get_interval_mapping(self, col_name: str):
+        """ Get the mapping from encoded value to its corresponding group. """
+        if self.bins is None:
+            raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
+
+        if col_name not in self.bins:
+            raise ValueError('Column {} was not seen during the fit process'.format(col_name))
+
+        cutoff = self.bins[col_name]
+        length = len(cutoff)
+        interval = enumerate([cutoff[i:i + 2] for i in range(length - 1)])
+        # the first interval is close on both ends
+        interval = ['[' + ', '.join(map(str, j)) + ']' if i == 0 else
+                    '(' + ', '.join(map(str, j)) + ']'
+                    for i, j in interval]
+        interval = ['(-inf, {})'.format(min(cutoff))] + interval + ['({}, inf)'.format(max(cutoff))]
+        mapping = dict(enumerate(interval))
+        mapping[self.fill] = 'MISSING'
+        return mapping
