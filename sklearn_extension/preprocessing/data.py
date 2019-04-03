@@ -5,8 +5,9 @@ import numpy as np
 import warnings
 
 
-from sklearn.utils import check_array, column_or_1d
+from sklearn.utils import check_array, column_or_1d, assert_all_finite
 from sklearn.utils.validation import check_is_fitted
+from sklearn.exceptions import NotFittedError
 
 
 def _encode_python(values, uniques=None, encode=False, unseen='warn'):
@@ -319,8 +320,6 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
             raise NotFittedError('This CorrelationRemover is not fitted. Call the fit method first.')
         # drop_cols = set(X.columns) & set(self.drop_cols)
         return X[self.keep_cols]
-
-
 
 
 if __name__ == '__main__':

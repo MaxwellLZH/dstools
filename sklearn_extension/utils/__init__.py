@@ -1,5 +1,5 @@
 from sklearn.preprocessing import LabelBinarizer
-from sklearn.utils import column_or_1d
+from sklearn.utils import column_or_1d, is_scalar_nan
 import pandas as pd
 import numpy as np
 
@@ -40,7 +40,7 @@ def searchsorted(a, v, fill=-1):
     """
     encoded = list()
     for value in v:
-        if np.isnan(value):
+        if is_scalar_nan(value):
             encoded.append(fill)
         elif value == min(a):
             # the leftmost interval close at both ends
@@ -59,7 +59,7 @@ def assign_group(x, bins):
     extended_cutoff = list(bins) + [np.inf]
     groups = list()
     for v in x:
-        if np.isnan(v):
+        if is_scalar_nan(v):
             groups.append(v)
         else:
             idx = _searchsorted(extended_cutoff, v)
