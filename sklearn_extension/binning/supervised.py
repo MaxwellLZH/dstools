@@ -208,6 +208,12 @@ class ChiSquareBinning(Binning):
 
         # the number of bins is the number of cutoff points minus 1
         n_bins = X.nunique() - 1
+
+        # if the number of bins is already smaller than `n_bins`
+        # then we'll leave this column as it is
+        if n_bins < self.max_bin:
+            return None
+
         # speed up the process with prebinning
         if self.prebin and n_bins > self.prebin:
             X, _ = equal_frequency_binning(X, n=self.prebin, encode=False)

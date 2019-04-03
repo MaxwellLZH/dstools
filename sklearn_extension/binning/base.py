@@ -63,7 +63,7 @@ class Binning(BaseEstimator, TransformerMixin):
         if self.bins is None:
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
 
-        if col_name not in self.bins:
+        if self.bins.get(col_name, None) is None:
             raise ValueError('Column {} was not seen during the fit process'.format(col_name))
 
         cutoff = self.bins[col_name]
