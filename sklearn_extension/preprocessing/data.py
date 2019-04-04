@@ -202,7 +202,8 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
         self.unseen = unseen
 
     def fit(self, X: pd.DataFrame, y=None):
-        X = X[self.cols] if self.cols else X
+        self.cols = self.cols or X.columns.tolist()
+
         if not self.fill:
             assert_all_finite(X, allow_nan=False)
         else:

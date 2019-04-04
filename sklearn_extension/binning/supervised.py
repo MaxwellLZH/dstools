@@ -271,20 +271,17 @@ class ChiSquareBinning(Binning):
         if self.bins is None:
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
 
-        if col_name not in self.bins:
-            raise ValueError('Column {} was not seen during the fit process'.format(col_name))
-
-        if col_name not in self.categorical_cols:
+        if col_name in self.categorical_cols and col_name in self.bins:
+            # categorical columns
+            encoding = self.discrete_encoding[col_name]
+            group = defaultdict(list)
+            for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
+                group[i].append(v)
+            group = {k: ', '.join(map(str, v)) for k, v in group.items()}
+            group[0] = 'UNSEEN'
+            return group
+        else:
             return super().get_interval_mapping(col_name)
-
-        # categorical column
-        encoding = self.discrete_encoding[col_name]
-        group = defaultdict(list)
-        for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
-            group[i].append(v)
-        group = {k: ', '.join(v) for k, v in group.items()}
-        group[0] = 'UNSEEN'
-        return group
 
 
 if __name__ == '__main__':
