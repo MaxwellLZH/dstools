@@ -12,15 +12,18 @@ class Binning(BaseEstimator, TransformerMixin):
                  bins=None,
                  encode: bool = True,
                  fill: int = -1):
-        """ bins is a dictionary mapping column names to its cutoff points
+        """ bins is a dictionary mapping column names to its cutoff points. If the cutoff points is
+        specified in the `bins` argument, it will not be fitted.
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
         :param fill: Used to fill in missing value.
-
         """
-        self.bins = bins
+        # self.set_bins is used to store all the user_specified cutoffs
+        self.set_bins = bins or list()
+        # self.bins is used to track all the cutoff points
+        self.bins = None
         self.encode = encode
         self.fill = fill
-        # list of columns that wasn't binned
+        # self.skip_cols is a list of columns that wasn't binned
         self.skip_cols = list()
         self.skip_cols_encoding = dict()
 
@@ -56,6 +59,10 @@ class Binning(BaseEstimator, TransformerMixin):
         """
         self.bins = dict()
         for col in X.columns:
+            # use the user specified cutoff point
+            if col in self.set_bins:
+                self.bins[col] = sorted(self.set_bins[col])
+
             cutoff = self._fit(X[col], y)
             if cutoff is not None:
                 # sort the cutoff points
