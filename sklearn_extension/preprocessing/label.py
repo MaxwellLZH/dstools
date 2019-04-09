@@ -35,12 +35,13 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
     def transform(self, X: pd.DataFrame, y=None):
         check_is_fitted(self, ['mapping_'])
         x = X.copy()
-        for col in self.cols:
+        for col in set(self.cols) & set(X.columns):
             if col not in self.mapping_:
                 raise ValueError('Column {} not seen during the fit() process.'.format(col))
             # TODO: Better way to deal with values that didn't appear in the fit() process
             # if value didn't appear in the fit() process find the nearest value for it
-            x[col] = x[col].map(lambda x: encode_with_nearest_key(self.mapping_[col], x))
+            # x[col] = x[col].map(lambda x: encode_with_nearest_key(self.mapping_[col], x))
+            x[col] = x[col].map(self.mapping_[col], x).fillna(0)
         return x
 
     def inverse_transform(self, X: pd.DataFrame, y=None):

@@ -12,13 +12,14 @@ class Binning(BaseEstimator, TransformerMixin):
                  bins=None,
                  encode: bool = True,
                  fill: int = -1):
-        """ bins is a dictionary mapping column names to its cutoff points. If the cutoff points is
-        specified in the `bins` argument, it will not be fitted.
+        """ bins is a dictionary mapping column names to its transformation rule. The transformation rule
+        can either be a list of cutoff points or a dictionary of value mapping.
+        If a column is specified in the `bins` argument, it will not be fitted during the `fit` method.
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
         :param fill: Used to fill in missing value.
         """
         # self.set_bins is used to store all the user_specified cutoffs
-        self.set_bins = bins or list()
+        self.set_bins = bins or dict()
         # self.bins is used to track all the cutoff points
         self.bins = None
         self.encode = encode
