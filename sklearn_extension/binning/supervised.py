@@ -257,21 +257,17 @@ class ChiSquareBinning(Binning):
         """ Transform a single feature"""
         # map discrete value to its corresponding percentage of positive samples
         col_name = X.name
-        if col_name in self.categorical_cols:
+        if col_name in self.discrete_encoding:
             # if the a new category is encountered, leave it as missing
             X = X.map(self.discrete_encoding[col_name])
-
-        if self.encode:
-            return searchsorted(self.bins[col_name], X, self.fill)
-        else:
-            return assign_group(X, self.bins[col_name])
+        return super()._transform(X, y)
 
     def get_interval_mapping(self, col_name: str):
         """ Get the mapping from encoded value to its corresponding group. """
         if self.bins is None:
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
 
-        if col_name in self.categorical_cols and col_name in self.bins:
+        if col_name in self.discrete_encoding:
             # categorical columns
             encoding = self.discrete_encoding[col_name]
             group = defaultdict(list)

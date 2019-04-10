@@ -24,9 +24,6 @@ class Binning(BaseEstimator, TransformerMixin):
         self.bins = None
         self.encode = encode
         self.fill = fill
-        # self.skip_cols is a list of columns that wasn't binned
-        self.skip_cols = list()
-        self.skip_cols_encoding = dict()
 
     def _fit(self, X: pd.Series, y, **fit_parmas):
         """ Fit a single feature and return the cutoff points or None,
@@ -35,23 +32,17 @@ class Binning(BaseEstimator, TransformerMixin):
         raise NotImplementedError
 
     def _transform(self, X: pd.Series, y=None):
-        """ Transform a single feature"""
+        """ Transform a single feature which has been fitted, aka the _fit method
+            returns cutoff points rather than None
+        """
         col_name = X.name
-        binned = assign_group(X, self.bins[col_name])
+        rule = self.bins[col_name]
+        binned = assign_group(X, rule)
 
         if self.encode:
-            return searchsorted(self.bins[col_name], binned, self.fill)
+            return searchsorted(rule, binned, self.fill)
         else:
             return binned
-
-    def _encode(self, X: pd.Series):
-        """" Encode an un-binned column """
-        col_name = X.name
-        mapping = self.skip_cols_encoding[col_name]
-        encoded = X.map(mapping).fillna(self.fill)
-        # assign 0 for unseen elements
-        encoded[~X.isin(mapping)] = 0
-        return encoded
 
     def fit(self, X: pd.DataFrame, y=None, **fit_params):
         """
@@ -66,15 +57,11 @@ class Binning(BaseEstimator, TransformerMixin):
 
             cutoff = self._fit(X[col], y)
             if cutoff is not None:
-                # sort the cutoff points
+                # save the sorted cutoff points
                 self.bins[col] = sorted(cutoff)
             else:
-                # save the col in `self.skip_cols` and create an
-                # mapping dictionary under `self.skip_cols_encoding`
-                self.skip_cols.append(col)
-                column = X[col]
-                column = column[column.notnull()].unique()
-                self.skip_cols_encoding[col] = {v: k+1 for k, v in enumerate(column)}
+                # save a mapping from value to encoding value (starting from 1)
+                self.bins[col] = {v: (k+1) for k, v in enumerate(X[col].unique())}
         return self
 
     def transform(self, X: pd.DataFrame, y=None):
@@ -82,12 +69,15 @@ class Binning(BaseEstimator, TransformerMixin):
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
         x = X.copy()
         for col in x.columns:
-            if col not in self.bins and col not in self.skip_cols:
+            if col not in self.bins:
                 raise ValueError('{} was not seen during the fit process'.format(col))
-            elif col in self.skip_cols:
-                x[col] = self._encode(x[col])
             else:
-                x[col] = self._transform(x[col])
+                if isinstance(self.bins[col], list):
+                    # rule is the cutoff points
+                    x[col] = self._transform(x[col])
+                else:
+                    # rule is the mapping
+                    x[col] = x[col].map(self.bins[col]).filna(self.fill)
         return x
 
     def get_interval_mapping(self, col_name: str):
@@ -95,24 +85,23 @@ class Binning(BaseEstimator, TransformerMixin):
         if self.bins is None:
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
 
-        if col_name not in self.bins and col_name not in self.skip_cols:
+        if col_name not in self.bins:
             raise ValueError('Column {} was not seen during the fit process'.format(col_name))
-        elif col_name in self.bins:
-            # binned columns
-            cutoff = self.bins[col_name]
-            length = len(cutoff)
-            interval = enumerate([cutoff[i:i + 2] for i in range(length - 1)])
+
+        rule = self.bins[col_name]
+        if isinstance(rule, list):
+            length = len(rule)
+            interval = enumerate([rule[i:i + 2] for i in range(length - 1)])
             # the first interval is close on both ends
             interval = ['[' + ', '.join(map(str, j)) + ']' if i == 0 else
                         '(' + ', '.join(map(str, j)) + ']'
                         for i, j in interval]
-            interval = ['(-inf, {})'.format(min(cutoff))] + interval + ['({}, inf)'.format(max(cutoff))]
+            interval = ['(-inf, {})'.format(min(rule))] + interval + ['({}, inf)'.format(max(rule))]
             mapping = dict(enumerate(interval))
             mapping[self.fill] = 'MISSING'
             return mapping
         else:
-            # skipped columns
-            mapping = {v: k for k, v in self.skip_cols_encoding[col_name].items()}
+            mapping = rule.copy()
+            mapping = {v: k for k, v in mapping.items()}
             mapping[self.fill] = 'MISSING'
-            mapping[0] = 'UNSEEN'
             return mapping
