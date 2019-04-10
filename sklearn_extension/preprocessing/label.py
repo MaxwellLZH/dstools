@@ -24,7 +24,7 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         # store a mapping from feature value to woe value
         self.mapping_ = dict()
         self.inverse_mapping_ = dict()
-        self.cols = self.cols or X.columns
+        self.cols = self.cols or X.columns.tolist()
 
         for col in self.cols:
             woe_value = woe(X[col], y)

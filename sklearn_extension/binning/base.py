@@ -77,7 +77,7 @@ class Binning(BaseEstimator, TransformerMixin):
                     x[col] = self._transform(x[col])
                 else:
                     # rule is the mapping
-                    x[col] = x[col].map(self.bins[col]).filna(self.fill)
+                    x[col] = x[col].map(self.bins[col]).fillna(self.fill)
         return x
 
     def get_interval_mapping(self, col_name: str):
