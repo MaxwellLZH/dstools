@@ -6,7 +6,7 @@ from ..utils import make_series
 
 def woe(X, y) -> pd.Series:
     """ Return a series mapping feature value to its woe stats"""
-    y = make_series(y)
+    X, y = make_series(X), make_series(y)
     total_pos = y.sum()
     total_neg = len(y) - total_pos
     grouped = y.groupby(X)

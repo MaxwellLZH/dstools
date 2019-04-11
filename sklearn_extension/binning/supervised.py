@@ -196,7 +196,7 @@ class ChiSquareBinning(Binning):
             raise ValueError('Column {} is not numeric and not in categorical_cols.'.format(X.name))
 
         y = force_zero_one(y)
-        y = make_series(y)
+        X, y = make_series(X), make_series(y)
 
         # if X is discrete, encode with positive ratio in y
         if X.name in self.categorical_cols:
