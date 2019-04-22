@@ -5,6 +5,8 @@ import statsmodels.api as sm
 import numpy as np
 import pandas as pd
 
+from ..utils import sort_columns_logistic, sort_columns_tree
+
 
 class StepwiseLogisticRegression(BaseEstimator, ClassifierMixin):
     """ Stepwise Logistic Regression
@@ -95,7 +97,7 @@ class StepwiseLogisticRegression(BaseEstimator, ClassifierMixin):
                 if need_backward_step:
                     model_cols, backward_stop_sign = self.backward_step(X, y, model_cols)
 
-                if self.mode=='forward':
+                if self.mode == 'forward':
                     stop_sign = forward_stop_sign
                 elif self.mode == 'bidirectional':
                     stop_sign = forward_stop_sign and backward_stop_sign
@@ -134,7 +136,7 @@ class IncrementalLogisticRegression(BaseEstimator, ClassifierMixin):
         """
         :param cols: columns ranked by importance from high to low, ex. iv
         :param max_feature: maximum number of features to use, default using all the features
-        :param sort: sort the features according to wald chi2
+        :param sort: Either a boolean, or the method name for sorting, available methods are ['tree', 'chi2']
         :param alpha_enter: alpha value below which a new feature will be added to the model
         :param kwargs: keyword arguments for fitting the LogisticRegression model in 
             transform() method
@@ -147,25 +149,6 @@ class IncrementalLogisticRegression(BaseEstimator, ClassifierMixin):
         
         self.model_cols = None
         self.model = None
-        
-    def sort_columns_logistic(self, X, y, cols):
-        """ Sort columns according to wald_chi2 """
-        logit_result = sm.Logit(y, X[cols+['const']]).fit()
-        wald_chi2 = np.square((logit_result.params) / np.square(logit_result.bse))
-        wald_chi2 = pd.DataFrame({'chi2': wald_chi2, 'feature': cols})
-        sorted_cols = wald_chi2.sort_values('chi2', ascending=False).feature.tolist()
-        sorted_cols.remove('const')
-        return sorted_cols
-    
-    def sort_columns_tree(self, X, y, cols):
-        """ Sort columns according to feature importance in tree method"""
-        from sklearn.ensemble import RandomForestClassifier
-        
-        RF = RandomForestClassifier()
-        RF.fit(X[cols], y)
-        importance = pd.DataFrame({'importance': RF.feature_importances_, 'feature': cols})
-        sorted_cols = importance.sort_values('importance', ascending=False).feature.tolist()
-        return sorted_cols
         
     def forward_step(self, X, y, candidate_col, model_cols):
         """ Perform a single forward step
@@ -188,9 +171,13 @@ class IncrementalLogisticRegression(BaseEstimator, ClassifierMixin):
     def fit(self, X, y, **fit_params):
         self.cols = cols = self.cols or X.columns.tolist()    
         
-        if self.sort:
-            self.cols = cols = self.sort_columns_tree(X, y, cols)
-        
+        if self.sort is True or self.sort == 'tree':
+            self.cols = cols = sort_columns_tree(X, y, cols)
+        elif self.sort == 'chi2':
+            self.cols = cols = sort_columns_logistic(X, y, cols)
+        elif self.sort is not None:
+            raise ValueError('Sorting method not supported.')
+
         X = sm.add_constant(X.copy(), has_constant='add')
 
         # ignore the convergence warnings for now

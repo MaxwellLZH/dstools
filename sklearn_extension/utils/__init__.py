@@ -2,6 +2,7 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.utils import column_or_1d, is_scalar_nan
 import pandas as pd
 import numpy as np
+import statsmodels.api as sm
 
 
 def force_zero_one(y):
@@ -103,3 +104,26 @@ def encode_with_default_value(series: pd.Series, key, default=0):
         return series[key]
     except KeyError:
         return default
+
+
+def sort_columns_logistic(X: pd.DataFrame, y, cols=None):
+    """ Sort columns according to wald_chi2 """
+    cols = cols or X.columns.tolist()
+    logit_result = sm.Logit(y, X[cols + ['const']]).fit()
+    wald_chi2 = np.square(logit_result.params / np.square(logit_result.bse))
+    wald_chi2 = pd.DataFrame({'chi2': wald_chi2, 'feature': cols})
+    sorted_cols = wald_chi2.sort_values('chi2', ascending=False).feature.tolist()
+    sorted_cols.remove('const')
+    return sorted_cols
+
+
+def sort_columns_tree(X: pd.DataFrame, y, cols=None):
+    """ Sort columns according to feature importance in tree method"""
+    from sklearn.ensemble import RandomForestClassifier
+
+    cols = cols or X.columns.tolist()
+    RF = RandomForestClassifier(n_estimators=100)
+    RF.fit(X[cols], y)
+    importance = pd.DataFrame({'importance': RF.feature_importances_, 'feature': cols})
+    sorted_cols = importance.sort_values('importance', ascending=False).feature.tolist()
+    return sorted_cols

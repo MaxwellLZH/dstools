@@ -4,10 +4,11 @@ import pandas as pd
 import numpy as np
 import warnings
 
-
 from sklearn.utils import check_array, column_or_1d, assert_all_finite
 from sklearn.utils.validation import check_is_fitted
 from sklearn.exceptions import NotFittedError
+
+from ..utils import sort_columns_logistic, sort_columns_tree
 
 
 def _encode_python(values, uniques=None, encode=False, unseen='warn'):
@@ -238,15 +239,17 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
 
 class CorrelationRemover(BaseEstimator, TransformerMixin):
 
-    def __init__(self, cols=None, categorical_cols=None, threshold=0.8, method='pearson', save_corr=False):
+    def __init__(self, cols=None, sort=False, categorical_cols=None, threshold=0.8, method='pearson', save_corr=False):
         """
         :param cols: A list of feature names, sorted by importance from high to low
+        :param sort: Either a boolean, or the method name for sorting, available methods are ['tree', 'chi2']
         :param categorical_cols: A list of categorical column names which will all be kept at the moment
         :param threshold: The correlation upper bound
         :param method: The method used for calculating correlation
         :param save_corr: Whether to save the correlation matrix
         """
         self.cols = cols
+        self.sort = sort
         self.categorical_cols = categorical_cols or list()
         self.threshold = threshold
         self.method = method
@@ -280,7 +283,14 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
             raise ValueError('The following columns does not exist in DataFrame X: ' +
                              repr(list(_error_cols)))
 
-        numerical_cols = list(set(cols) - set(self.categorical_cols))
+        if self.sort is True or self.sort == 'tree':
+            self.cols = cols = sort_columns_tree(X, y, cols)
+        elif self.sort == 'chi2':
+            self.cols = cols = sort_columns_logistic(X, y, cols)
+        elif self.sort is not None:
+            raise ValueError('Sorting method not supported.')
+
+        numerical_cols = [c for c in cols if c not in self.categorical_cols]
         # make sure the categorical column actually exist in DataFrame X
         categorical_cols = self.categorical_cols or X.select_dtypes(include=['object']).columns.tolist()
         categorical_cols = [c for c in categorical_cols if c in cols]
@@ -295,7 +305,7 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
                 for j in range(i+1, len(numerical_cols)):
                     c_b = numerical_cols[j]
                     if c_b not in self.drop_cols and \
-                        num_corr_mat.loc[c_a, c_b] > self.threshold:
+                            num_corr_mat.loc[c_a, c_b] > self.threshold:
                             self.drop_cols.append(c_b)
             if self.save_corr:
                 self.num_corr_mat = num_corr_mat

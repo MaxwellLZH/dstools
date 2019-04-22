@@ -267,7 +267,7 @@ class ChiSquareBinning(Binning):
         if self.bins is None:
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
 
-        if col_name in self.discrete_encoding:
+        if col_name in self.discrete_encoding and isinstance(self.bins[col_name], list):
             # categorical columns
             encoding = self.discrete_encoding[col_name]
             group = defaultdict(list)
