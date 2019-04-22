@@ -263,7 +263,7 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
         corr_mat = np.empty((n, n))
         
         def cat_corr(s1: pd.Series, s2: pd.Series):
-            return (s1.fillna('_MISSING_')==s2.fillna('_MISSING_')).mean()
+            return (s1.fillna('_MISSING_') == s2.fillna('_MISSING_')).mean()
         
         for i in range(n):
             for j in range(i+1):

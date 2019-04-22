@@ -201,7 +201,7 @@ class ChiSquareBinning(Binning):
         # if X is discrete, encode with positive ratio in y
         if X.name in self.categorical_cols:
             # the categorical columns will remain unchanged if
-            # we turn of  bin_cat_cols
+            # we turn off  bin_cat_cols
             if not self.bin_cat_cols:
                 return None
             X = self.encode_with_label(X, y)

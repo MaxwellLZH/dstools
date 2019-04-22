@@ -1,7 +1,9 @@
 import pandas as pd
+from collections import defaultdict
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
-from ..utils import searchsorted, assign_group
+from sklearn.utils import is_scalar_nan
+from ..utils import searchsorted, assign_group, map_series
 
 
 class Binning(BaseEstimator, TransformerMixin):
@@ -53,7 +55,11 @@ class Binning(BaseEstimator, TransformerMixin):
         for col in X.columns:
             # use the user specified cutoff point
             if col in self.set_bins:
-                self.bins[col] = sorted(self.set_bins[col])
+                if isinstance(self.set_bins[col], list):
+                    self.bins[col] = sorted(self.set_bins[col])
+                else:
+                    self.bins[col] = self.set_bins[col]
+                continue
 
             cutoff = self._fit(X[col], y)
             if cutoff is not None:
@@ -61,7 +67,8 @@ class Binning(BaseEstimator, TransformerMixin):
                 self.bins[col] = sorted(cutoff)
             else:
                 # save a mapping from value to encoding value (starting from 1)
-                self.bins[col] = {v: (k+1) for k, v in enumerate(X[col].unique())}
+                self.bins[col] = {v: (k+1) for k, v in enumerate(X[col].unique()) \
+                                     if not is_scalar_nan(v)}
         return self
 
     def transform(self, X: pd.DataFrame, y=None):
@@ -76,8 +83,9 @@ class Binning(BaseEstimator, TransformerMixin):
                     # rule is the cutoff points
                     x[col] = self._transform(x[col])
                 else:
-                    # rule is the mapping
-                    x[col] = x[col].map(self.bins[col]).fillna(self.fill)
+                    # rule is the mapping, set any unseen categories to 0
+                    mapping = self.bins[col]
+                    x[col] = map_series(x[col], mapping, 0, self.fill)
         return x
 
     def get_interval_mapping(self, col_name: str):
@@ -101,7 +109,11 @@ class Binning(BaseEstimator, TransformerMixin):
             mapping[self.fill] = 'MISSING'
             return mapping
         else:
-            mapping = rule.copy()
-            mapping = {v: k for k, v in mapping.items()}
+            mapping = defaultdict(list)
+            for k, v in rule.items():
+                mapping[v].append(k)
+
+            mapping = {k: '[' + ', '.join(map(str, v)) + ']' for k, v in mapping.items()}
             mapping[self.fill] = 'MISSING'
+            mapping[0] = 'UNSEEN'
             return mapping

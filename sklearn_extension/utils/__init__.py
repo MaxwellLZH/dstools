@@ -26,6 +26,15 @@ def make_series(i, reset_index=True) -> pd.Series:
     return series
 
 
+def map_series(X: pd.Series, mapping: dict, unseen=0, fill=-99):
+    def _map(x):
+        if is_scalar_nan(x):
+            return fill
+        else:
+            return mapping.get(x, unseen)
+    return X.map(_map)
+
+
 def _searchsorted(a, v):
     """ Same as np.searchsorted(a, v, side='left') but faster for our purpose."""
     for i, c in enumerate(a):
