@@ -109,6 +109,8 @@ def encode_with_default_value(series: pd.Series, key, default=0):
 def sort_columns_logistic(X: pd.DataFrame, y, cols=None):
     """ Sort columns according to wald_chi2 """
     cols = cols or X.columns.tolist()
+
+    X = sm.add_constant(X.copy())
     logit_result = sm.Logit(y, X[cols + ['const']]).fit()
     wald_chi2 = np.square(logit_result.params / np.square(logit_result.bse))
     wald_chi2 = pd.DataFrame({'chi2': wald_chi2, 'feature': cols})
