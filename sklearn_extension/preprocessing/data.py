@@ -357,7 +357,7 @@ class SparsityRemover(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         if self.drop_cols is None:
             raise NotFittedError('This CorrelationRemover is not fitted. Call the fit method first.')
-        drop_cols = set(self.drop_cols) & X.columns
+        drop_cols = set(self.drop_cols) & set(X.columns)
         return X.drop(drop_cols, axis=1)
 
 
