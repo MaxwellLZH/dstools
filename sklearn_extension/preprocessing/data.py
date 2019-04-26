@@ -302,6 +302,8 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
             num_corr_mat = X[numerical_cols].corr(method=self.method).abs()
             
             for i, c_a in enumerate(numerical_cols):
+                if c_a in self.drop_cols:
+                    continue
                 for j in range(i+1, len(numerical_cols)):
                     c_b = numerical_cols[j]
                     if c_b not in self.drop_cols and \
@@ -314,6 +316,8 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
             cat_corr_mat = self.cat_corr_matrix(X[categorical_cols]).abs()
             
             for i, c_a in enumerate(categorical_cols):
+                if c_a in self.drop_cols:
+                    continue
                 for j in range(i+1, len(categorical_cols)):
                     c_b = categorical_cols[j]
                     if c_b not in self.drop_cols and \
