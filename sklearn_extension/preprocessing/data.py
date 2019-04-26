@@ -350,7 +350,7 @@ class SparsityRemover(BaseEstimator, TransformerMixin):
     def fit(self, X: pd.DataFrame, y=None, **fit_params):
         self.cols = self.cols or X.columns.tolist()
 
-        missing_pct = X[self.cols].notnull().mean()
+        missing_pct = X[self.cols].isnull().mean()
         self.drop_cols = missing_pct[missing_pct > self.threshold].index.tolist()
         return self
 
