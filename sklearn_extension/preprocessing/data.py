@@ -337,6 +337,30 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
         return X[self.keep_cols]
 
 
+class SparsityRemover(BaseEstimator, TransformerMixin):
+
+    def __init__(self, cols=None, threshold=0.8):
+        """
+        :param threshold: Minimum percentage of missing value to drop the column.
+        """
+        self.cols = cols
+        self.threshold = threshold
+        self.drop_cols = None
+
+    def fit(self, X: pd.DataFrame, y=None, **fit_params):
+        self.cols = self.cols or X.columns.tolist()
+
+        missing_pct = X[self.cols].notnull().mean()
+        self.drop_cols = missing_pct[missing_pct > self.threshold].index.tolist()
+        return self
+
+    def transform(self, X, y=None):
+        if self.drop_cols is None:
+            raise NotFittedError('This CorrelationRemover is not fitted. Call the fit method first.')
+        drop_cols = set(self.drop_cols) & X.columns
+        return X.drop(drop_cols, axis=1)
+
+
 if __name__ == '__main__':
     import random
     import numpy as np

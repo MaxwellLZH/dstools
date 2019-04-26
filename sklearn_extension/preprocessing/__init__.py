@@ -7,5 +7,6 @@ __all__ = [
     'IQROutlierRemover',
     'QuantileOutlierRemover',
     'OrdinalEncoder',
-    'CorrelationRemover'
+    'CorrelationRemover',
+    'SparsityRemover'
 ]
