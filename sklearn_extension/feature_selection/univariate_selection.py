@@ -4,9 +4,23 @@ import numpy as np
 from ..utils import make_series
 
 
-def woe(X, y) -> pd.Series:
-    """ Return a series mapping feature value to its woe stats"""
+def woe(X, y, conditional=False, na_values=None) -> pd.Series:
+    """ Return a series mapping feature value to its woe stats
+    :param conditional: If set to True, the part where X is missing will be excluded from the calculation
+    :param na_values: Values that should be treated as NaN
+    """
     X, y = make_series(X), make_series(y)
+    if conditional:
+        if na_values is None:
+            mask = pd.notnull(X)
+        elif isinstance(na_values, (list, tuple)):
+            from pandas.core.algorithms import isin
+            mask = ~isin(X, na_values)
+        else:
+            mask = X != na_values
+        X, y = X[mask], y[mask]
+
+    print(X.shape, y.shape)
     total_pos = y.sum()
     total_neg = len(y) - total_pos
     grouped = y.groupby(X)

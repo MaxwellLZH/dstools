@@ -9,11 +9,15 @@ from ..utils import encode_with_nearest_key
 
 class WoeEncoder(BaseEstimator, TransformerMixin):
 
-    def __init__(self, cols=None):
+    def __init__(self, cols=None, conditional_cols=None, na_values=None):
         """
         :param cols: A list of column names to apply transformations, default for all the columns
+        :param conditional_cols: A list of columns that needs to calculate the woe value with conditional flag
+        :param na_values: Values that should be treated as NaN
         """
         self.cols = cols
+        self.conditional_cols = conditional_cols or []
+        self.na_values = na_values
 
     def fit(self, X: pd.DataFrame, y):
         # missing value can not be handled by WoeEncoder since np.nan will fail the equality check
@@ -23,7 +27,9 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         self.cols = self.cols or X.columns.tolist()
 
         for col in self.cols:
-            woe_value = woe(X[col], y)
+            woe_value = woe(X[col], y,
+                            conditional=col in self.conditional_cols,
+                            na_values=self.na_values)
             self.mapping_[col] = woe_value
         return self
 
@@ -49,5 +55,4 @@ if __name__ == '__main__':
 
     WE = WoeEncoder(cols=['a', 'b'])
     encoded = WE.fit_transform(X, y)
-    decoded = WE.inverse_transform(encoded)
     print(encoded)
