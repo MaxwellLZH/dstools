@@ -11,15 +11,18 @@ class Binning(BaseEstimator, TransformerMixin):
         Subclasses should overwrite the _fit and _transform method for their own purporses.
     """
     def __init__(self,
+                 cols=None,
                  bins=None,
                  encode: bool = True,
                  fill: int = -1):
         """ bins is a dictionary mapping column names to its transformation rule. The transformation rule
         can either be a list of cutoff points or a dictionary of value mapping.
         If a column is specified in the `bins` argument, it will not be fitted during the `fit` method.
+        :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
         :param fill: Used to fill in missing value.
         """
+        self.cols = cols
         # self.set_bins is used to store all the user_specified cutoffs
         self.set_bins = bins or dict()
         # self.bins is used to track all the cutoff points
@@ -51,8 +54,10 @@ class Binning(BaseEstimator, TransformerMixin):
         :param X: Pandas DataFrame with shape (n_sample, n_feature)
         :param y: a label column with shape (n_sample, )
         """
+        self.cols = self.cols or X.columns.tolist()
         self.bins = dict()
-        for col in X.columns:
+
+        for col in self.cols:
             # use the user specified cutoff point
             if col in self.set_bins:
                 if isinstance(self.set_bins[col], list):
@@ -75,7 +80,7 @@ class Binning(BaseEstimator, TransformerMixin):
         if self.bins is None:
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
         x = X.copy()
-        for col in x.columns:
+        for col in self.cols:
             if col not in self.bins:
                 raise ValueError('{} was not seen during the fit process'.format(col))
             else:

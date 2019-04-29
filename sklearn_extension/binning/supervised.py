@@ -14,6 +14,7 @@ class ChiSquareBinning(Binning):
 
     def __init__(self,
                  max_bin: int,
+                 cols: list = None,
                  bins: dict = None,
                  categorical_cols: List[str] = None,
                  bin_cat_cols: bool = True,
@@ -26,6 +27,7 @@ class ChiSquareBinning(Binning):
                  prebin: int = 100):
         """
         :param max_bin: The number of bins to split into
+        :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
         :param bins: A dictionary mapping column name to cutoff points
         :param categorical_cols: A list of categorical columns
         :param bin_cat_cols: Whether to perform binning on categorical columns
@@ -38,7 +40,7 @@ class ChiSquareBinning(Binning):
         :param ignore_na: The monotonicity check will ignore missing value
         :param prebin: An integer, number of bins to split into before the chimerge process.
         """
-        super().__init__(bins, encode, fill)
+        super().__init__(cols, bins, encode, fill)
         self.max_bin = max_bin
         self.categorical_cols = categorical_cols or []
         self.bin_cat_cols = bin_cat_cols

@@ -11,17 +11,19 @@ from .base import Binning
 class EqualWidthBinning(Binning):
     def __init__(self,
                  n: int,
+                 cols: list = None,
                  bins: dict = None,
                  encode: bool = True,
                  fill: int = -1):
         """
         :param n: Number of bins to split into
+        :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
         :param bins: A dictionary mapping column name to cutoff points
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
             If the input has missing values, it will be put under a seperate group with the largest bin value
         :param fill: Used to fill in missing value.
         """
-        super().__init__(bins, encode, fill)
+        super().__init__(cols, bins, encode, fill)
         self.n = n
 
     def _fit(self, X: pd.Series, y=None, **fit_parmas):
@@ -43,16 +45,18 @@ class EqualFrequencyBinning(Binning):
 
     def __init__(self,
                  n: int,
+                 cols: list = None,
                  bins: dict = None,
                  encode: bool = True,
                  fill: int = -1):
         """
         :param q: Number of equal width intervals to split into
+        :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
         :param bins: A series of cutoff points, if provided, n will be ignored
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
         :param fill: Used to fill in missing value.
         """
-        super().__init__(bins, encode, fill)
+        super().__init__(cols, bins, encode, fill)
         self.n = n
 
     def _fit(self, X: pd.Series, y=None, **fit_parmas):
