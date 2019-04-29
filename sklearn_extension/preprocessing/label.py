@@ -13,23 +13,18 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         """
         :param cols: A list of column names to apply transformations, default for all the columns
         """
-        if isinstance(cols, str):
-            self.cols = [cols]
-        else:
-            self.cols = cols
+        self.cols = cols
 
     def fit(self, X: pd.DataFrame, y):
         # missing value can not be handled by WoeEncoder since np.nan will fail the equality check
         assert_all_finite(X)
         # store a mapping from feature value to woe value
         self.mapping_ = dict()
-        self.inverse_mapping_ = dict()
         self.cols = self.cols or X.columns.tolist()
 
         for col in self.cols:
             woe_value = woe(X[col], y)
             self.mapping_[col] = woe_value
-            self.inverse_mapping_[col] = pd.Series(woe_value.index, woe_value.values)
         return self
 
     def transform(self, X: pd.DataFrame, y=None):
@@ -42,15 +37,6 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
             # if value didn't appear in the fit() process find the nearest value for it
             # x[col] = x[col].map(lambda x: encode_with_nearest_key(self.mapping_[col], x))
             x[col] = x[col].map(self.mapping_[col], x).fillna(0)
-        return x
-
-    def inverse_transform(self, X: pd.DataFrame, y=None):
-        check_is_fitted(self, ['mapping_'])
-        x = X.copy()
-        for col in self.cols:
-            if col not in self.mapping_:
-                raise ValueError('Column {} not seen during the fit() process.'.format(col))
-            x[col] = x[col].map(self.inverse_mapping_[col])
         return x
 
 
