@@ -20,7 +20,6 @@ def woe(X, y, conditional=False, na_values=None) -> pd.Series:
             mask = X != na_values
         X, y = X[mask], y[mask]
 
-    print(X.shape, y.shape)
     total_pos = y.sum()
     total_neg = len(y) - total_pos
     grouped = y.groupby(X)

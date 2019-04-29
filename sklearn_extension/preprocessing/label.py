@@ -20,13 +20,16 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         self.na_values = na_values
 
     def fit(self, X: pd.DataFrame, y):
-        # missing value can not be handled by WoeEncoder since np.nan will fail the equality check
-        assert_all_finite(X)
         # store a mapping from feature value to woe value
         self.mapping_ = dict()
         self.cols = self.cols or X.columns.tolist()
 
         for col in self.cols:
+            if col not in self.conditional_cols:
+                # missing value can not be handled by WoeEncoder
+                # since np.nan will fail the equality check
+                assert_all_finite(X[col])
+
             woe_value = woe(X[col], y,
                             conditional=col in self.conditional_cols,
                             na_values=self.na_values)
