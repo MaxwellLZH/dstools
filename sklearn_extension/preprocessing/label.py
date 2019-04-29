@@ -42,10 +42,15 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         for col in set(self.cols) & set(X.columns):
             if col not in self.mapping_:
                 raise ValueError('Column {} not seen during the fit() process.'.format(col))
-            # TODO: Better way to deal with values that didn't appear in the fit() process
-            # if value didn't appear in the fit() process find the nearest value for it
-            # x[col] = x[col].map(lambda x: encode_with_nearest_key(self.mapping_[col], x))
-            x[col] = x[col].map(self.mapping_[col], x).fillna(0)
+
+            if col not in self.conditional_cols:
+                # TODO: Better way to deal with values that didn't appear in the fit() process
+                # if value didn't appear in the fit() process find the nearest value for it
+                # x[col] = x[col].map(lambda x: encode_with_nearest_key(self.mapping_[col], x))
+                x[col] = x[col].map(self.mapping_[col]).fillna(0)
+            else:
+                # for conditional columns propagate the NaN values
+                x[col] = x[col].map(self.mapping_[col])
         return x
 
 
