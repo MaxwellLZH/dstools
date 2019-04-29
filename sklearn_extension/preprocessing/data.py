@@ -250,7 +250,7 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
         """
         self.cols = cols
         self.sort = sort
-        self.categorical_cols = categorical_cols or list()
+        self.categorical_cols = categorical_cols
         self.threshold = threshold
         self.method = method
         self.save_corr = save_corr
@@ -290,11 +290,12 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
         elif self.sort is not None:
             raise ValueError('Sorting method not supported.')
 
-        numerical_cols = [c for c in cols if c not in self.categorical_cols]
         # make sure the categorical column actually exist in DataFrame X
-        categorical_cols = self.categorical_cols or X.select_dtypes(include=['object']).columns.tolist()
-        categorical_cols = [c for c in categorical_cols if c in cols]
+        categorical_cols = self.categorical_cols or \
+                           [c for c in X.select_dtypes(include=['object']).columns if c in cols]
         self.categorical_cols = categorical_cols
+
+        numerical_cols = [c for c in cols if c not in self.categorical_cols]
 
         self.drop_cols = list()
 
