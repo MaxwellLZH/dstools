@@ -16,13 +16,14 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
         :param na_values: Values that should be treated as NaN
         """
         self.cols = cols
-        self.conditional_cols = conditional_cols or []
+        self.conditional_cols = conditional_cols
         self.na_values = na_values
 
     def fit(self, X: pd.DataFrame, y):
         # store a mapping from feature value to woe value
         self.mapping_ = dict()
         self.cols = self.cols or X.columns.tolist()
+        self.conditional_cols = self.conditional_cols or []
 
         for col in self.cols:
             if col not in self.conditional_cols:
