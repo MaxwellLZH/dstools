@@ -22,29 +22,31 @@ class WoeEncoder(BaseEstimator, TransformerMixin):
     def fit(self, X: pd.DataFrame, y):
         # store a mapping from feature value to woe value
         self.mapping_ = dict()
-        self.cols = self.cols or X.columns.tolist()
-        self.conditional_cols = self.conditional_cols or []
+        cols = self.cols or X.columns.tolist()
+        conditional_cols = self.conditional_cols or []
 
-        for col in self.cols:
-            if col not in self.conditional_cols:
+        for col in cols:
+            if col not in conditional_cols:
                 # missing value can not be handled by WoeEncoder
                 # since np.nan will fail the equality check
                 assert_all_finite(X[col])
 
             woe_value = woe(X[col], y,
-                            conditional=col in self.conditional_cols,
+                            conditional=col in conditional_cols,
                             na_values=self.na_values)
             self.mapping_[col] = woe_value
         return self
 
     def transform(self, X: pd.DataFrame, y=None):
         check_is_fitted(self, ['mapping_'])
+
+        conditional_cols = self.conditional_cols or []
         x = X.copy()
-        for col in set(self.cols) & set(X.columns):
+        for col in self.cols or X.columns:
             if col not in self.mapping_:
                 raise ValueError('Column {} not seen during the fit() process.'.format(col))
 
-            if col not in self.conditional_cols:
+            if col not in conditional_cols:
                 # TODO: Better way to deal with values that didn't appear in the fit() process
                 # if value didn't appear in the fit() process find the nearest value for it
                 # x[col] = x[col].map(lambda x: encode_with_nearest_key(self.mapping_[col], x))
