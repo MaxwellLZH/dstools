@@ -74,16 +74,16 @@ class StepwiseLogisticRegression(BaseEstimator, ClassifierMixin):
         return model_cols, is_last_step
             
     def fit(self, X, y, **fit_params):
-        self.cols = cols = self.cols or X.columns.tolist()
+        cols = self.cols or X.columns.tolist()
         X = sm.add_constant(X.copy())
         
         need_forward_step = self.mode in ('forward', 'bidirectional')
         need_backward_step = self.mode in ('bidirectional', 'backward')
         
         if need_forward_step:
-            candidate_cols, model_cols = self.cols, ['const']
+            candidate_cols, model_cols = cols, ['const']
         else:
-            candidate_cols, model_cols = None, self.cols + ['const']
+            candidate_cols, model_cols = None, cols + ['const']
         
         stop_sign = False
         # ignore the convergence warnings for now
@@ -169,12 +169,12 @@ class IncrementalLogisticRegression(BaseEstimator, ClassifierMixin):
             return model_cols
                 
     def fit(self, X, y, **fit_params):
-        self.cols = cols = self.cols or X.columns.tolist()    
+        cols = self.cols or X.columns.tolist()
         
         if self.sort is True or self.sort == 'tree':
-            self.cols = cols = sort_columns_tree(X, y, cols)
+            cols = sort_columns_tree(X, y, cols)
         elif self.sort == 'chi2':
-            self.cols = cols = sort_columns_logistic(X, y, cols)
+            cols = sort_columns_logistic(X, y, cols)
         elif self.sort is not None:
             raise ValueError('Sorting method not supported.')
 

@@ -49,18 +49,13 @@ class NormDistOutlierRemover(BaseEstimator, TransformerMixin):
             supported actions are ['raise', 'ignore', 'warn']
         """
         self.n_sigma = n_sigma
-        if isinstance(cols, str):
-            self.cols = [cols]
-        else:
-            self.cols = cols
+        self.cols = cols
         self.error = error
 
     def fit(self, X: pd.DataFrame, y=None):
-        X = X[self.cols] if self.cols else X
-        self.cols = self.cols or X.columns
-
-        self.mean_ = X.mean()
-        self.std_ = X.std()
+        cols = self.cols or X.columns.tolist()
+        self.mean_ = X[cols].mean()
+        self.std_ = X[cols].std()
         return self
 
     def transform(self, X: pd.DataFrame, y=None):
@@ -69,7 +64,8 @@ class NormDistOutlierRemover(BaseEstimator, TransformerMixin):
 
         # copy instance variable to local variable
         _mean, _std, n_sigma = self.mean_, self.std_, self.n_sigma
-        for col in self.cols:
+
+        for col in self.cols or X.columns:
             if col not in x:
                 msg = 'Column {} is not found in the DataFrame'.format(col)
                 if self.error == 'raise':
@@ -97,19 +93,15 @@ class IQROutlierRemover(BaseEstimator, TransformerMixin):
         """
         self.multiplier =multiplier
         self.interpolation = interpolation
-        if isinstance(cols, str):
-            self.cols = [cols]
-        else:
-            self.cols = cols
+        self.cols = cols
         self.error = error
 
     def fit(self, X: pd.DataFrame, y=None):
-        X = X[self.cols] if self.cols else X
-        self.cols = self.cols or X.columns
+        cols = self.cols or X.columns.tolist()
 
-        q1 = X.quantile(0.25, interpolation=self.interpolation)
-        q3 = X.quantile(0.75, interpolation=self.interpolation)
-        self.q2 = X.quantile(0.5, interpolation=self.interpolation)
+        q1 = X[cols].quantile(0.25, interpolation=self.interpolation)
+        q3 = X[cols].quantile(0.75, interpolation=self.interpolation)
+        self.q2 = X[cols].quantile(0.5, interpolation=self.interpolation)
         self.iqr = q3 - q1
         return self
 
@@ -117,7 +109,8 @@ class IQROutlierRemover(BaseEstimator, TransformerMixin):
         check_is_fitted(self, 'iqr')
         q2, iqr, m = self.q2, self.iqr, self.multiplier
         x = X.copy()
-        for col in self.cols:
+
+        for col in self.cols or X.columns:
             if col not in x:
                 msg = 'Column {} is not found in the DataFrame'.format(col)
                 if self.error == 'raise':
@@ -154,7 +147,7 @@ class QuantileOutlierRemover(BaseEstimator, TransformerMixin):
         self.lower_threshold = None
 
     def fit(self, X: pd.DataFrame, y=None):
-        self.cols = cols = self.cols or X.select_dtypes(include='number').columns.tolist()
+        cols = self.cols or X.select_dtypes(include='number').columns.tolist()
         self.skewness = skewness = pd.Series(skew(X[cols]), index=cols)
         self.pos_skew_cols = pos_skew_cols = skewness[skewness > self.skewness_threshold].index.tolist()
         self.neg_skew_cols = neg_skew_cols = skewness[skewness < -self.skewness_threshold].index.tolist()
@@ -194,16 +187,13 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
         :param unseen: Specify the action when encountered with unseen values,
             supported actions are ['raise, 'silent', 'warn']
         """
-        if isinstance(cols, str):
-            self.cols = [cols]
-        else:
-            self.cols = cols
+        self.cols = cols
         self.fill = fill
         self.error = error
         self.unseen = unseen
 
     def fit(self, X: pd.DataFrame, y=None):
-        self.cols = self.cols or X.columns.tolist()
+        cols = self.cols or X.columns.tolist()
 
         if not self.fill:
             assert_all_finite(X, allow_nan=False)
@@ -211,7 +201,7 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
             X = X.copy().fillna('_MISSING')
         self.categories_ = dict()
 
-        for col in X:
+        for col in cols:
             cutoff = _encode_python(X[col].astype(str))
             self.categories_[col] = cutoff
         return self
@@ -220,7 +210,7 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
         check_is_fitted(self, 'categories_')
         x = X.copy()
 
-        for col in self.cols:
+        for col in self.cols or X.columns:
             if col not in x:
                 msg = 'Column {} is not found in the DataFrame'.format(col)
                 if self.error == 'raise':
@@ -277,16 +267,16 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None, **fit_params):
         """ Return the number of dropped columns """
-        self.cols = cols = self.cols or X.columns.tolist()
+        cols = self.cols or X.columns.tolist()
         _error_cols = set(cols) - set(X.columns)
         if _error_cols:
             raise ValueError('The following columns does not exist in DataFrame X: ' +
                              repr(list(_error_cols)))
 
         if self.sort is True or self.sort == 'tree':
-            self.cols = cols = sort_columns_tree(X, y, cols)
+            cols = sort_columns_tree(X, y, cols)
         elif self.sort == 'chi2':
-            self.cols = cols = sort_columns_logistic(X, y, cols)
+            cols = sort_columns_logistic(X, y, cols)
         elif self.sort is not None:
             raise ValueError('Sorting method not supported.')
 
@@ -349,9 +339,9 @@ class SparsityRemover(BaseEstimator, TransformerMixin):
         self.drop_cols = None
 
     def fit(self, X: pd.DataFrame, y=None, **fit_params):
-        self.cols = self.cols or X.columns.tolist()
+        cols = self.cols or X.columns.tolist()
 
-        missing_pct = X[self.cols].isnull().mean()
+        missing_pct = X[cols].isnull().mean()
         self.drop_cols = missing_pct[missing_pct > self.threshold].index.tolist()
         return self
 

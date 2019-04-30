@@ -54,10 +54,10 @@ class Binning(BaseEstimator, TransformerMixin):
         :param X: Pandas DataFrame with shape (n_sample, n_feature)
         :param y: a label column with shape (n_sample, )
         """
-        self.cols = self.cols or X.columns.tolist()
+        cols = self.cols or X.columns.tolist()
         self.bins = dict()
 
-        for col in self.cols:
+        for col in cols:
             # use the user specified cutoff point
             if col in self.set_bins:
                 if isinstance(self.set_bins[col], list):
@@ -80,7 +80,8 @@ class Binning(BaseEstimator, TransformerMixin):
         if self.bins is None:
             raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
         x = X.copy()
-        for col in self.cols:
+
+        for col in self.cols or X.columns:
             if col not in self.bins:
                 raise ValueError('{} was not seen during the fit process'.format(col))
             else:
