@@ -277,7 +277,7 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
             cols = sort_columns_tree(X, y, cols)
         elif self.sort == 'chi2':
             cols = sort_columns_logistic(X, y, cols)
-        elif self.sort is not None:
+        elif self.sort is not False:
             raise ValueError('Sorting method not supported.')
 
         # make sure the categorical column actually exist in DataFrame X
@@ -317,15 +317,13 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
         
             if self.save_corr:
                 self.cat_corr_mat = cat_corr_mat
-                        
-        self.keep_cols = [c for c in cols if c not in self.drop_cols]
         return self
 
     def transform(self, X, y=None):
         if self.drop_cols is None:
             raise NotFittedError('This CorrelationRemover is not fitted. Call the fit method first.')
-        # drop_cols = set(X.columns) & set(self.drop_cols)
-        return X[self.keep_cols]
+        drop_cols = set(X.columns) & set(self.drop_cols)
+        return X.drop(drop_cols, axis=1)
 
 
 class SparsityRemover(BaseEstimator, TransformerMixin):
