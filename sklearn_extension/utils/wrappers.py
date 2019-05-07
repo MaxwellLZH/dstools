@@ -1,8 +1,41 @@
 import re
 import pandas as pd
 import numpy as np
+import functools
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
+
+
+__all__ = ['return_frame', 'ConditionalWrapper']
+
+
+def _pass_index_and_columns(f):
+    @functools.wraps(f)
+    def wrapped_fit_method(*args, **kwargs):
+        # find X
+        if 'X' in kwargs:
+            X = kwargs['X']
+        else:
+            X = args[1]
+
+        idx, cols = X.index, X.columns
+        res = f(*args, **kwargs)
+        if not isinstance(res, pd.DataFrame):
+            res = pd.DataFrame(res, index=idx, columns=cols)
+        return res
+
+    return wrapped_fit_method
+
+
+def return_frame(cls):
+    """ A class decorator for Scikit-Learn transformers
+        that make sure the transform() method returns a DataFrame with same index and columns.
+    """
+    if not issubclass(cls, BaseEstimator) and hasattr(cls, 'transform'):
+        raise ValueError('Not a Scikit-Learn transformer.')
+    wrapped_transform = _pass_index_and_columns(getattr(cls, 'transform'))
+    setattr(cls, 'transform', wrapped_transform)
+    return cls
 
 
 class ConditionalWrapper(BaseEstimator, TransformerMixin):
@@ -20,7 +53,6 @@ class ConditionalWrapper(BaseEstimator, TransformerMixin):
         self.estimator = estimator
         self.cols = cols
         self.na_values = na_values
-        self.valid_index = None
         self.col_name = col_name
         self.drop = drop
 
@@ -40,16 +72,22 @@ class ConditionalWrapper(BaseEstimator, TransformerMixin):
         else:
             self.cols = [c for c in self.cols if c in X.columns]
 
-        self.valid_index = valid_index = self.find_valid_index(X[self.cols])
+        valid_index = self.find_valid_index(X[self.cols])
         y = y[valid_index] if y is not None else y
         self.estimator.fit(X.loc[valid_index, self.cols], y)
         return self
 
     def transform(self, X, y=None):
-        if self.valid_index is None:
-            raise NotFittedError('The ConditionalWrapper is not fitted yet.')
         x = X.copy()
-        res = self.estimator.transform(x.loc[self.valid_index, self.cols])
+
+        valid_index = self.find_valid_index(X[self.cols])
+        if hasattr(self.estimator, 'transform'):
+            res = self.estimator.transform(x.loc[valid_index, self.cols])
+        elif hasattr(self.estimator, 'fit_transform'):
+            # for estimators like TSNE, ISOMAP
+            res = self.estimator.fit_transform(x.loc[valid_index, self.cols])
+        else:
+            raise AttributeError('Estimator does not have transform or fit_transform method.')
 
         if hasattr(self.estimator, 'n_components'):
             # dimension reduction
@@ -57,10 +95,10 @@ class ConditionalWrapper(BaseEstimator, TransformerMixin):
             for c in col_name:
                 x[c] = np.nan
 
-            x.loc[self.valid_index, col_name] = res
+            x.loc[valid_index, col_name] = res
             return x.drop(self.cols, axis=1) if self.drop else x
         else:
-            x.loc[self.valid_index, self.cols] = res
+            x.loc[valid_index, self.cols] = res
             return x
 
     def __repr__(self):
@@ -70,3 +108,4 @@ class ConditionalWrapper(BaseEstimator, TransformerMixin):
 
     def __getattr__(self, item):
         return getattr(self.estimator, item)
+

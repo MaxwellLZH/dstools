@@ -1,5 +1,6 @@
 from sklearn.base import BaseEstimator, TransformerMixin
-from scipy.stats import skew    
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from scipy.stats import skew
 import pandas as pd
 import numpy as np
 import warnings
@@ -9,6 +10,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.exceptions import NotFittedError
 
 from ..utils import sort_columns_logistic, sort_columns_tree
+from ..utils.wrappers import return_frame
 
 
 def _encode_python(values, uniques=None, encode=False, unseen='warn'):
@@ -36,6 +38,11 @@ def _encode_python(values, uniques=None, encode=False, unseen='warn'):
         return uniques, encoded
     else:
         return uniques
+
+
+# A wrapped version of Scikit-Learn preprocessors
+StandardScaler = return_frame(StandardScaler)
+MinMaxScaler = return_frame(MinMaxScaler)
 
 
 class NormDistOutlierRemover(BaseEstimator, TransformerMixin):
@@ -348,6 +355,8 @@ class SparsityRemover(BaseEstimator, TransformerMixin):
             raise NotFittedError('This CorrelationRemover is not fitted. Call the fit method first.')
         drop_cols = set(self.drop_cols) & set(X.columns)
         return X.drop(drop_cols, axis=1)
+
+
 
 
 if __name__ == '__main__':
