@@ -1,3 +1,11 @@
+import numpy as np
+
+
+def cosine_similarity(v1, v2):
+    """ Cosine similartiy between two vector"""
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+
 def jarccard_index(A, B, ignore_na=True):
     """ Calculate the jarccard index (aka jaccard similarity).
     :param ignore_na: Whether to filter out the missing value before calculation
