@@ -38,6 +38,54 @@ def return_frame(cls):
     return cls
 
 
+import functools
+
+
+def _init_with_cols(f):
+    @functools.wraps(f)
+    def wrapped_init(*args, **kwargs):
+        cols = kwargs.get('cols', None)
+        self_obj = args[0]
+        setattr(self_obj, 'cols', cols)
+
+    return wrapped_init
+
+
+def _subset(f):
+    @functools.wraps(f)
+    def wrapped(*args, **kwargs):
+        # get X and probabily y
+        self_obj = args[0]
+        print(f.__name__, len(args), len(kwargs))
+        X = kwargs.pop('X') if 'X' in kwargs else args[1]
+        print(type(X))
+        if 'y' in kwargs:
+            y = kwargs.pop(y)
+        elif len(args) > 2:
+            y = args[2]
+        else:
+            y = None
+
+        cols = getattr(self_obj, 'cols', X.columns.tolist)
+        X_ = X[cols]
+        return f(self_obj, X_, y, **kwargs)
+
+    return wrapped
+
+
+def add_cols_argument(cls):
+    orig_init = getattr(cls, '__init__')
+    setattr(cls, '__init__', _init_with_cols(orig_init))
+    if hasattr(cls, 'fit'):
+        orig_fit = getattr(cls, 'fit')
+        setattr(cls, 'fit', _subset(orig_fit))
+    if hasattr(cls, 'transform'):
+        orig_transform = getattr(cls, 'transform')
+        setattr(cls, 'transform', _subset(orig_transform))
+    return cls
+
+
+
 class ConditionalWrapper(BaseEstimator, TransformerMixin):
     """ A conditional wrapper that makes a Scikit-Learn transformer only works on part of the data
         where X is not missing.
