@@ -1,11 +1,11 @@
 from sklearn.exceptions import NotFittedError
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
+import numpy as np
 import numpy as np
 from collections import defaultdict
 from typing import Dict, Iterable, Tuple, List
 
-from ..utils import force_zero_one, make_series, searchsorted, assign_group
+from ..utils import force_zero_one, make_series, searchsorted
 from .base import Binning
 from .unsupervised import equal_frequency_binning
 
@@ -32,13 +32,22 @@ class ChiSquareBinning(Binning):
         :param categorical_cols: A list of categorical columns
         :param bin_cat_cols: Whether to perform binning on categorical columns
         :param encode: If set to False, the result of transform will be right cutoff point of the interval
-        :param fill: Label for missing value
+        :param fill: Value used for inputing missing value
         :param force_monotonic:  Whether to force the bins to be monotonic with the
                 positive proportion of the label
-        :param force_mix_label:  Whether to force the all the bins to have mix labels
+        :param force_mix_label:  Whether to force all the bins to have mix labels
         :param strict: If set to True, equal values will not be treated as monotonic
         :param ignore_na: The monotonicity check will ignore missing value
         :param prebin: An integer, number of bins to split into before the chimerge process.
+
+        Usage:
+        --------------
+        >>> from sklearn.datasets import load_iris
+        >>> from sklearn.linear_model import LogisticRegression
+        >>> X, y = load_iris(return_X_y=True)
+        >>> CB = ChiSquareBinning(max_bin=5, force_monotonic=True, force_mix_label=True)
+        >>> encoded = CB.fit_transform(X, y)
+        >>> CB.bins # get the cutoff points
         """
         super().__init__(cols, bins, encode, fill)
         self.max_bin = max_bin
