@@ -121,3 +121,15 @@ def find_duplicates(iterable, min_count=1, with_count=True):
         return [k for k, v in counter.items() if v > min_count]
     else:
         return [(k, v) for k, v in counter.items() if v > min_count]
+
+
+def weighted_sum(elements, weights=1):
+    from collections.abc import Iterable
+    from itertools import starmap
+    from operator import mul
+
+    if not isinstance(weights, Iterable):
+        weights = [weights] * len(elements)
+
+    return sum(starmap(mul, zip(elements, weights))) / sum(weights)
+
