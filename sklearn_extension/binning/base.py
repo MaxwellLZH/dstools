@@ -1,5 +1,6 @@
 import pandas as pd
 from collections import defaultdict
+from collections.abc import Iterable
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.utils import is_scalar_nan
@@ -68,8 +69,14 @@ class Binning(BaseEstimator, TransformerMixin):
 
             cutoff = self._fit(X[col], y)
             if cutoff is not None:
-                # save the sorted cutoff points
-                self.bins[col] = sorted(cutoff)
+                if isinstance(cutoff, dict):
+                    # save the mapping
+                    self.bins[col] = cutoff
+                elif isinstance(cutoff, Iterable):
+                    # save the sorted cutoff points
+                    self.bins[col] = sorted(cutoff)
+                else:
+                    raise ValueError('Only iterable and dictionary is accepted as cutoff, get {} instead.'.format(type(cutoff)))
             else:
                 # save a mapping from value to encoding value (starting from 1)
                 self.bins[col] = {v: (k+1) for k, v in enumerate(X[col].unique()) \

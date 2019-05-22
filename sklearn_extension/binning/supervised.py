@@ -1,5 +1,6 @@
 from sklearn.exceptions import NotFittedError
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 import numpy as np
 import numpy as np
 from collections import defaultdict
@@ -220,10 +221,15 @@ class ChiSquareBinning(Binning):
         # the number of bins is the number of cutoff points minus 1
         n_bins = X.nunique() - 1
 
-        # if the number of bins is already smaller than `n_bins`
-        # then we'll leave this column as it is
+        # if the number of bins is less than `max_bin` then
+        # set the column as a mapping
         if n_bins < self.max_bin:
-            return None
+            if X.name in self.categorical_cols:
+                # mapping bad rate to encoding
+                group_mapping = {v: i+1 for i, v in enumerate(set(X[X.notnull()]))}
+                return self.discrete_encoding[X.name].map(group_mapping).to_dict()
+            else:
+                return None
 
         # speed up the process with prebinning
         if self.prebin and n_bins > self.prebin:
