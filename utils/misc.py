@@ -133,3 +133,9 @@ def weighted_sum(elements, weights=1):
 
     return sum(starmap(mul, zip(elements, weights))) / sum(weights)
 
+
+def limit_precision(x, n_digit=2):
+	""" Limit the precision of a float number """
+    pattern = '{0:.' + str(n_digit) + 'f}'
+    print(pattern)
+    return float(pattern.format(x))

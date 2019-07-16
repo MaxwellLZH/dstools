@@ -20,6 +20,8 @@ def plot_distribution(rv, rv_options=None, bins=100, ax=None):
     rv_options = rv_options or dict()
     if ax is None:
         fig, ax = plt.subplots()
+    else:
+        fig = ax.figure
 
     if isinstance(rv, stats.rv_continuous):
         # continuous variable
