@@ -124,7 +124,23 @@ def parse_tree(tree):
 
 class TreeBinner(BaseEstimator, TransformerMixin):
     
-    def __init__(self, cols=None, categorical_cols=None, bins=10, min_frac=0.05, fill=-1, random_state=1024):
+    def __init__(self, cols=None, bins=10, categorical_cols=None, min_frac=0.05, fill=-1, random_state=1024):
+        """
+        :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
+        :param bins: Maximum number of bins to split into
+        :param categorical_cols: A list of categorical columns
+        :param min_frac: Minimum fraction of samples within each bin
+        :param fill: Value used for inputing missing value
+        :param random_state: Random state used for growing trees
+
+        Usage:
+        --------------
+        >>> from sklearn.datasets import load_breast_cancer
+        >>> X, y = load_breast_cancer(return_X_y=True)
+        >>> TB = TreeBinner(bins=5, min_frac=0.05)
+        >>> CB.fit(X, y)
+        >>> CB.interval_mapping  # Get the interval for each bin
+        """
         self.cols = cols
         self.categorical_cols = categorical_cols or []
         self.bins = bins

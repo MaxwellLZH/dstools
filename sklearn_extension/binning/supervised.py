@@ -48,9 +48,9 @@ class ChiSquareBinning(Binning):
 
         Usage:
         --------------
-        >>> from sklearn.datasets import load_iris
+        >>> from sklearn.datasets import load_breast_cancer
         >>> from sklearn.linear_model import LogisticRegression
-        >>> X, y = load_iris(return_X_y=True)
+        >>> X, y = load_breast_cancer(return_X_y=True)
         >>> CB = ChiSquareBinning(max_bin=5, force_monotonic=True, force_mix_label=True)
         >>> encoded = CB.fit_transform(X, y)
         >>> CB.bins # get the cutoff points
