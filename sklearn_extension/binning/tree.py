@@ -187,4 +187,3 @@ class TreeBinner(BaseEstimator, TransformerMixin):
             for col in self.interval_mapping:
                 X_[col] = self._transform(X_[col])
         return X_
-
