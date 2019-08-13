@@ -10,7 +10,7 @@ from ..utils import force_zero_one, make_series, searchsorted
 from .base import Binning
 from .unsupervised import equal_frequency_binning
 
-from -tree import TreeBinner
+from .tree import TreeBinner
 
 
 __all__ = ['ChiSquareBinning', 'TreeBinner']
