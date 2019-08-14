@@ -23,15 +23,15 @@ def _encode_python(values, uniques=None, encode=False, unseen='warn'):
         try:
             encoded = np.array([table[v] for v in values])
         except KeyError as e:
-            msg = "y contains previously unseen labels: %s" % str(e)
+            c = values.name if hasattr(values, 'name') else 'Column'
+            msg = "{} contains previously unseen labels: {}".format(c, e)
             if unseen in ('silent', 'warn'):
                 UNSEEN = len(uniques)
                 encoded = np.array([table.get(v, UNSEEN) for v in values])
                 if unseen == 'warn':
                     warnings.warn(msg)
             elif unseen == 'raise':
-                raise ValueError("y contains previously unseen labels: %s"
-                                 % str(e))
+                raise ValueError(msg)
             else:
                 raise ValueError('The supported options for `unseen` are: {}'
                                  .format(['silent', 'warn', 'raise']))
