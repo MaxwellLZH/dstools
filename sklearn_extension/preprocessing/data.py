@@ -1,5 +1,5 @@
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from scipy.stats import skew
 import pandas as pd
 import numpy as np
@@ -43,6 +43,7 @@ def _encode_python(values, uniques=None, encode=False, unseen='warn'):
 # A wrapped version of Scikit-Learn preprocessors
 StandardScaler = return_frame(StandardScaler)
 MinMaxScaler = return_frame(MinMaxScaler)
+RobustScaler = return_frame(RobustScaler)
 
 
 class NormDistOutlierRemover(BaseEstimator, TransformerMixin):
