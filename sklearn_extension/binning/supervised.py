@@ -57,7 +57,7 @@ class ChiSquareBinning(Binning):
         """
         super().__init__(cols, bins, encode, fill)
         self.max_bin = max_bin
-        self.categorical_cols = categorical_cols or []
+        self.categorical_cols = categorical_cols
         self.bin_cat_cols = bin_cat_cols
         self.force_monotonic = force_monotonic
         self.force_mix_label = force_mix_label
@@ -209,6 +209,8 @@ class ChiSquareBinning(Binning):
 
     def _fit(self, X, y, **fit_parmas):
         """ Fit a single feature and return the cutoff points"""
+        self.categorical_cols = self.categorical_cols or []
+
         if not is_numeric_dtype(X) and X.name not in self.categorical_cols:
             raise ValueError('Column {} is not numeric and not in categorical_cols.'.format(X.name))
 
