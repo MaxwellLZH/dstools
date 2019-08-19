@@ -3,8 +3,30 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils import _print_elapsed_time
 from sklearn.utils.validation import check_memory
 from sklearn.base import clone
+from sklearn.preprocessing import FunctionTransformer
+import pandas as pd
 
-__all__ = ['Pipeline']
+
+__all__ = ['Pipeline', 'Inspect']
+
+
+def _inspect_step(X, y=None):
+    """ A step that can be plugged into the pipeline to inspect the 
+        intermediary output within the pipeline """
+    if not isinstance(X, pd.DataFrame):
+        X = pd.DataFrame(X)
+    
+    print('=' * 80)
+    print('Shape of X: {}'.format(X.shape))
+    print('=' * 80)
+    print('Missing percentage: {}'.format(X.isnull().mean()))
+    print('=' * 80)
+    if y is not None:
+        print('Label distribution: {}'.format(pd.Series(y).value_counts(True)))
+        print('=' * 80)
+    return X
+
+Inspect = FunctionTransformer(_inspect_step, validate=False)
 
 
 def _fit_transform_one(transformer,
