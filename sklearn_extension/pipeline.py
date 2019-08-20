@@ -3,7 +3,6 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils import _print_elapsed_time
 from sklearn.utils.validation import check_memory
 from sklearn.base import clone, BaseEstimator, TransformerMixin
-from sklearn.preprocessing import FunctionTransformer
 import pandas as pd
 import inspect
 
