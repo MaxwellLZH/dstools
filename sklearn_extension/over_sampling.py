@@ -9,6 +9,9 @@ from imblearn.over_sampling import KMeansSMOTE as _KMeansSMOTE
 from imblearn.over_sampling import RandomOverSampler as _RandomOverSampler
 
 
+__all__ = ['SMOTE', 'BorderlineSMOTE', 'SVMSMOTE', 'KMeansSMOTE', 'RandomOverSampler']
+
+
 def _sampler_as_transformer(cls):
 	""" Allow sampler from imblearn package to have a scikit-like interface (ie, with transform method) """
 	transform_method = getattr(cls, 'fit_resample', None)

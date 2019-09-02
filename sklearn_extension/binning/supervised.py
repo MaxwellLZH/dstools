@@ -228,16 +228,13 @@ class ChiSquareBinning(Binning):
         # the number of bins is the number of cutoff points minus 1
         n_bins = X.nunique() - 1
 
-        # if the number of bins is less than `max_bin` then
+        # if the number of bins is less than `max_bin` for categorical columns then
         # set the column as a mapping
-        if n_bins < self.max_bin:
-            if X.name in self.categorical_cols:
+        if n_bins < self.max_bin and X.name in self.categorical_cols:
                 # mapping bad rate to encoding
                 group_mapping = {v: i+1 for i, v in enumerate(set(X[X.notnull()]))}
                 return self.discrete_encoding[X.name].map(group_mapping).to_dict()
-            else:
-                return None
-
+        
         # speed up the process with prebinning
         if self.prebin and n_bins > self.prebin:
             X, _ = equal_frequency_binning(X, n=self.prebin, encode=False)

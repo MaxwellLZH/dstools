@@ -26,6 +26,7 @@ def find_choices(tree, x):
 
 
 def search_prefix_tree(tree, x):
+    """ Search a prefix tree for a given string x """
     res = ''
     for ch in x:
         if ch not in tree:

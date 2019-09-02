@@ -15,7 +15,7 @@ def list_docs(module):
     module_name = module.__name__
     methods = [getattr(module, i) for i in dir(module)
                if not i.startswith('_') and
-               not isinstance(getattr(module, i), (ModuleType))]
+                 not isinstance(getattr(module, i), (ModuleType))]
     docs = dict()
     for m in methods:
         # unwrap the decorators
