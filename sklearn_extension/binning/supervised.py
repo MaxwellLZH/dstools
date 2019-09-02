@@ -10,7 +10,7 @@ from ..utils import force_zero_one, make_series, searchsorted
 from .base import Binning
 from .unsupervised import equal_frequency_binning
 
-from .tree import TreeBinner
+from .tree import TreeBinner, tree_binning
 
 
 __all__ = ['ChiSquareBinning', 'TreeBinner']
@@ -30,7 +30,9 @@ class ChiSquareBinning(Binning):
                  force_mix_label: bool = True,
                  strict: bool = True,
                  ignore_na: bool = True,
-                 prebin: int = 100):
+                 prebin: int = 100,
+                 prebin_method: str = 'tree',
+                 min_frac=0.02):
         """
         :param max_bin: The number of bins to split into
         :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
@@ -45,6 +47,10 @@ class ChiSquareBinning(Binning):
         :param strict: If set to True, equal values will not be treated as monotonic
         :param ignore_na: The monotonicity check will ignore missing value
         :param prebin: An integer, number of bins to split into before the chimerge process.
+        :param prebin_method: A string, indicating which binner is used for prebinning. 'tree' for
+                TreeBinner and 'equal_freq` for using equal frequency binning.
+        :param min_frac: Minimum fraction of samples within each bin. Only supported when the prebin_method
+                is 'tree'.
 
         Usage:
         --------------
@@ -63,9 +69,13 @@ class ChiSquareBinning(Binning):
         self.force_mix_label = force_mix_label
         self.strict = strict
         self.ignore_na = ignore_na
+
+        self.prebin = prebin
+        self.prebin_method = prebin_method
+        self.min_frac = min_frac
+
         # mapping for discrete variables
         self.discrete_encoding = dict()
-        self.prebin = prebin
         self._chisquare_cache = dict()
 
     def calculate_chisquare(self, mapping: Dict[int, list], candidates: Iterable) -> float:
@@ -234,11 +244,16 @@ class ChiSquareBinning(Binning):
                 # mapping bad rate to encoding
                 group_mapping = {v: i+1 for i, v in enumerate(set(X[X.notnull()]))}
                 return self.discrete_encoding[X.name].map(group_mapping).to_dict()
-        
+
         # speed up the process with prebinning
         if self.prebin and n_bins > self.prebin:
-            X, _ = equal_frequency_binning(X, n=self.prebin, encode=False)
-            # X = make_series(X)
+            if self.prebin_method.lower() == 'tree':
+                X, _ = tree_binning(X, y, n=self.prebin, min_frac=self.min_frac, 
+                                    encode=False, random_state=1024)
+            elif self.prebin_method.lower() == 'equal_freq':
+                X, _ = equal_frequency_binning(X, n=self.prebin, encode=False)
+            else:
+                raise ValueError('Only `tree` and `equal_freq` is supported for prebin_method.')
 
         # convert to mapping
         mapping = y.groupby(X).apply(list).to_dict()
