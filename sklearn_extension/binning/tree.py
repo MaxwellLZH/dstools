@@ -11,98 +11,56 @@ import warnings
 
 
 @total_ordering
-class Edge:
-    __slots__ = ['closed', 'value']
-    def __init__(self, value, closed):
-        self.value = value
-        self.closed = closed
-        
-    def __lt__(self, other):
-        return self.value < other.value
-    
-    def __gt__(self, other):
-        return self.value > other.value
-
-    def __eq__(self, other):
-        return self.value == other.value and self.closed == other.closed
-    
-    def __repr__(self):
-        return 'Edge<value={}, closed={}>'.format(self.value, self.closed)
-
-
-def find_edge(e1, e2, edge='left', expand=True):
-    """ Return the appropriate edge given side and action """
-    # the operator that should return e1
-    if (edge == 'left') != expand:
-        op1, op2 = operator.gt, operator.lt
-    else:
-        op1, op2 = operator.lt, operator.gt
-    
-    closed = e1.closed or e2.closed if expand else e1.closed and e2.closed
-    if op1(e1, e2):
-        return e1
-    elif op2(e1, e2):
-        return e2
-    else:
-        return Edge(e1.value, closed)
-
-
 class Interval:
-    def __init__(self, left=-np.inf, right=np.inf, left_closed=False, right_closed=False):
-        self.left = Edge(left, left_closed)
-        self.right = Edge(right, right_closed)
+    """ A dummy inplementation of Interval, no validation on (and|or) operations and 
+        doesn't include information on open or close edges.
+    """
+    
+    def __init__(self, left=-np.inf, right=np.inf):
+        self.left = left
+        self.right = right
         
     def __repr__(self):
-        return '{lb}{l}, {r}{rb}'.format(lb='[' if self.left.closed else '(',
-                                                l=self.left.value,
-                                                r=self.right.value,
-                                                rb=']' if self.right.closed else ')')
-    @classmethod
-    def from_edge(cls, left, right):
-        return cls(left.value, right.value, left.closed, right.closed)
+        return 'Interval<{}, {}>'.format(self.left, self.right)
+    
+    def __lt__(self, other):
+        return self.left < other.left
+    
+    def __eq__(self, other):
+        return (self.left == other.left) and (self.right == other.right)
     
     def copy(self):
-        return Interval.from_edge(self.left, self.right)
+        return Interval(self.left, self.right)
         
     def __eq__(self, other):
         return self.left == other.left and self.right == other.right
     
     def __and__(self, other):
-        return Interval.from_edge(find_edge(self.left, other.left, edge='left', expand=False), 
-                                  find_edge(self.right, other.right, edge='right', expand=False))
+        return Interval(max(self.left, other.left), min(self.right, other.right))
     
     def __or__(self, other):
-        return Interval.from_edge(find_edge(self.left, other.left, edge='left', expand=True), 
-                                  find_edge(self.right, other.right, edge='right', expand=True))
+        return Interval(min(self.left, other.left), max(self.right, other.right))
     
-    def clip_right(self, value, closed=True):
-        assert value > self.left.value
-        right = Edge(value, closed)
-        right = find_edge(self.right, right, edge='right', expand=False)
-        return Interval.from_edge(self.left, right)
-
-    def clip_left(self, value, closed=True):
-        assert value < self.right.value
-        left = Edge(value, closed)
-        left = find_edge(self.left, left, edge='left', expand=False)
-        return Interval.from_edge(left, self.right)
-
-    def expand_right(self, value, closed=True):
-        right = Edge(value, closed)
-        right = find_edge(self.right, right, edge='right', expand=True)
-        return Interval.from_edge(self.left, right)
+    def clip_right(self, value):
+        return Interval(self.left, min(self.right, value))
     
-    def expand_left(self, value, closed=True):
-        left = Edge(value, closed)
-        self.left = find_edge(self.left, left, edge='left', expand=True)
-        return Interval.from_edge(left, self.right)
+    def clip_left(self, value):
+        return Interval(max(self.left, value), self.right)
 
+    def expand_right(self, value):
+        return Interval(self.left, max(self.right, value))
+    
+    def expand_left(self, value):
+        return Interval(min(self.left, value), self.right)
 
 
 def parse_tree(tree):
     """ Parse a tree object into a list of intervals, where intervals[i] is the 
         interval for node[i] in this tree
     """
+    if hasattr(tree, 'tree_'):
+        return parse_tree(tree.tree_)
+    
     children_left = tree.children_left
     children_right = tree.children_right
     # feature_index = tree.feature
@@ -117,15 +75,22 @@ def parse_tree(tree):
 
         left, right = children_left[node_idx], children_right[node_idx]
         threshold = thresholds[node_idx]
-        intervals[left] = intervals[node_idx].clip_right(threshold, closed=True)
-        intervals[right] = intervals[node_idx].clip_left(threshold, closed=False)
+        intervals[left] = intervals[node_idx].clip_right(threshold)
+        intervals[right] = intervals[node_idx].clip_left(threshold)
     
     return intervals
 
 
 class TreeBinner(BaseEstimator, TransformerMixin):
     
-    def __init__(self, cols=None, bins=10, categorical_cols=None, min_frac=0.05, fill=-1, random_state=1024):
+    def __init__(self, 
+                 cols=None, 
+                 bins=10, 
+                 categorical_cols=None, 
+                 min_frac=0.05, 
+                 encode=True,
+                 fill=-1, 
+                 random_state=1024):
         """
         :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
         :param bins: Maximum number of bins to split into
@@ -146,12 +111,25 @@ class TreeBinner(BaseEstimator, TransformerMixin):
         self.categorical_cols = categorical_cols or []
         self.bins = bins
         self.min_frac = min_frac
+        self.encode = encode
         self.fill = fill
         
         self.discrete_encoding = None
+        # the min and max value for each feature
+        self.min_ = None
+        self.max_ = None
+        
         self.trees = None
         self.interval_mapping = None
         self.random_state = random_state
+        
+    @staticmethod
+    def _drop_na(X, y):
+        # make sure y has the same index as X
+        y = pd.Series(y, index=X.index)
+        
+        idx = X[X.notnull()].index
+        return X.loc[idx], y.loc[idx]
     
     def _fit(self, X: pd.Series, y): 
         if not is_numeric_dtype(X) and X.name not in self.categorical_cols:
@@ -160,7 +138,10 @@ class TreeBinner(BaseEstimator, TransformerMixin):
         if X.name in self.categorical_cols:
             X = self.encode_with_label(X, y)
         
-        _, X, y = drop_na(X, y, according='x')
+        if not self.encode:
+            self.min_[X.name], self.max_[X.name] = X.min(), X.max() 
+            
+        X, y = self._drop_na(X, y)
         DT = DecisionTreeClassifier(max_leaf_nodes=self.bins,
                                     min_samples_leaf=self.min_frac, 
                                     random_state=self.random_state)
@@ -177,6 +158,9 @@ class TreeBinner(BaseEstimator, TransformerMixin):
     def fit(self, X, y, **fit_params):
         cols = self.cols or X.columns
         
+        if not self.encode:
+            self.min_, self.max_ = {}, {}
+        
         self.interval_mapping, self.trees, self.discrete_encoding = {}, {}, {}
         for col in cols:
             self.interval_mapping[col], self.trees[col] = self._fit(X[col], y)
@@ -191,7 +175,18 @@ class TreeBinner(BaseEstimator, TransformerMixin):
         tree = self.trees[col_name]
         valid_index = X.notnull()
         X[valid_index] = tree.apply(X[valid_index].to_frame())
-        return X.fillna(self.fill).astype(int)
+        
+        if self.encode:
+            return X.fillna(self.fill).astype(int)
+        else:
+            # create a mapping from interval index to edge value
+            # edge left is only used for the leftmost node (where Interval.left == -np.inf)
+            _min, _max = self.min_[col_name], self.max_[col_name]
+            cutoff_mapping = {i: _min if j.left == -np.inf else min(_max, j.right)
+                                for i, j in enumerate(self.interval_mapping[col_name])}
+            X[valid_index] = X[valid_index].map(cutoff_mapping)
+            # leave NaN unfilled if self.encode is False
+            return X
     
     def transform(self, X, y=None):
         if self.interval_mapping is None:
@@ -201,6 +196,13 @@ class TreeBinner(BaseEstimator, TransformerMixin):
         with warnings.catch_warnings():
             # Ignore the set on copy warnings
             warnings.simplefilter('ignore')
-            for col in self.interval_mapping:
+            for col in self.cols or X.columns:
                 X_[col] = self._transform(X_[col])
         return X_
+
+
+def tree_binning(X: pd.Series, y, n: int, min_frac: float=0.05, encode: bool=True, fill: int=-1, random_state: int=1024):
+    s_name = X.name
+    TB = TreeBinner(bins=n, min_frac=min_frac, encode=encode, fill=fill, random_state=random_state)
+    binned = TB.fit_transform(X.to_frame(), y)
+    return binned[s_name], None if encode else sorted(binned[s_name].unique())
