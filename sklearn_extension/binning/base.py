@@ -4,6 +4,11 @@ from collections.abc import Iterable
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 from sklearn.utils import is_scalar_nan
+try:
+    from tqdm import trange
+except:
+    trange = range
+
 from ..utils import searchsorted, assign_group, map_series
 
 
@@ -58,7 +63,10 @@ class Binning(BaseEstimator, TransformerMixin):
         cols = self.cols or X.columns.tolist()
         self.bins = dict()
 
-        for col in cols:
+        _range = trange if fit_params.get('verbose', 1) else range
+        for i in _range(len(cols)):
+            col = cols[i]
+
             # use the user specified cutoff point
             if col in self.set_bins:
                 if isinstance(self.set_bins[col], list):

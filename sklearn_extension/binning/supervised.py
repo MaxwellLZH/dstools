@@ -241,9 +241,9 @@ class ChiSquareBinning(Binning):
         # if the number of bins is less than `max_bin` for categorical columns then
         # set the column as a mapping
         if n_bins < self.max_bin and X.name in self.categorical_cols:
-                # mapping bad rate to encoding
-                group_mapping = {v: i+1 for i, v in enumerate(set(X[X.notnull()]))}
-                return self.discrete_encoding[X.name].map(group_mapping).to_dict()
+            # mapping bad rate to encoding
+            group_mapping = {v: i+1 for i, v in enumerate(set(X[X.notnull()]))}
+            return self.discrete_encoding[X.name].map(group_mapping).to_dict()
 
         # speed up the process with prebinning
         if self.prebin and n_bins > self.prebin:
