@@ -39,9 +39,10 @@ def map_series(X: pd.Series, mapping: dict, unseen=0, fill=-99):
 def _searchsorted(a, v):
     """ Same as np.searchsorted(a, v, side='left') but faster for our purpose."""
     for i, c in enumerate(a):
-        if c >= v:
+        if c > v:
             return i
-    return len(a)
+    else:
+        return len(a)
 
 
 def searchsorted(a, v, fill=-1):
@@ -66,17 +67,24 @@ def assign_group(x, bins):
         ex. assign_group(range(6), [0, 2, 4]) => [0, 2, 2, 4, 4, np.inf]
     """
     # add infinite at the end
-    extended_cutoff = list(bins) + [np.inf]
+    bins = np.array(bins)
     groups = list()
     for v in x:
         if is_scalar_nan(v):
             groups.append(v)
-        else:
-            idx = _searchsorted(extended_cutoff, v)
-            if idx < 1:
-                groups.append(extended_cutoff[0])
+
+        elif v <= bins[0]:
+            groups.append(bins[0])
+            continue
+        
+        else:    
+            # find the cutoff value that's larger or equal than the current value
+            idx = np.argmax(bins >= v)
+            if idx > 0:
+                groups.append(bins[idx])
             else:
-                groups.append(extended_cutoff[idx])
+                # none of the cutoff points is larger than the value
+                groups.append(np.inf)            
     return groups
 
 

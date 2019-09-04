@@ -153,14 +153,19 @@ class ChiSquareBinning(Binning):
             del mapping[to_replace]
             return mapping
 
-        # make sure replace_value is the bigger one
-        if replace_value < original_value:
-            replace_value, original_value = original_value, replace_value
+        if replace_value > original_value:
+            original_value, replace_value = replace_value, original_value
 
-        if original_value == min(mapping):
-            return _replace(mapping, replace_value, original_value)
-        else:
-            return _replace(mapping, original_value, replace_value)
+        return _replace(mapping, original_value, replace_value)
+
+        # make sure replace_value is the bigger one
+        # if replace_value < original_value:
+        #     replace_value, original_value = original_value, replace_value
+
+        # if original_value == min(mapping):
+        #     return _replace(mapping, replace_value, original_value)
+        # else:
+        #     return _replace(mapping, original_value, replace_value)
 
     def merge_chisquare(self, mapping: Dict[int, list], candidates=None) -> Dict[int, list]:
         """ Performs a single merge based on chi square value
@@ -282,7 +287,7 @@ class ChiSquareBinning(Binning):
 
         # merge bins to keep bins to be monotonic
         if self.force_monotonic:
-            while len(mapping) - 1 > 2 and not self.is_monotonic_post_bin(mapping):
+            while len(mapping) > 2 and not self.is_monotonic_post_bin(mapping):
                 mapping = self.merge_chisquare(mapping)
 
         # clean up the cache

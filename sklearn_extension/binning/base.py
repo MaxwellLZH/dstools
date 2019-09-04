@@ -48,12 +48,11 @@ class Binning(BaseEstimator, TransformerMixin):
         """
         col_name = X.name
         rule = self.bins[col_name]
-        binned = assign_group(X, rule)
 
         if self.encode:
-            return searchsorted(rule, binned, self.fill)
+            return searchsorted(rule, X, self.fill)
         else:
-            return binned
+            return assign_group(X, rule)
 
     def fit(self, X: pd.DataFrame, y=None, **fit_params):
         """
@@ -122,9 +121,7 @@ class Binning(BaseEstimator, TransformerMixin):
             length = len(rule)
             interval = enumerate([rule[i:i + 2] for i in range(length - 1)])
             # the first interval is close on both ends
-            interval = ['[' + ', '.join(map(str, j)) + ']' if i == 0 else
-                        '(' + ', '.join(map(str, j)) + ']'
-                        for i, j in interval]
+            interval = ['[' + ', '.join(map(str, j)) + ')' for i, j in interval]   
             interval = ['(-inf, {})'.format(min(rule))] + interval + ['({}, inf)'.format(max(rule))]
             mapping = dict(enumerate(interval))
             mapping[self.fill] = 'MISSING'
