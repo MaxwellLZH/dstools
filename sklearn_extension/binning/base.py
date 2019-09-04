@@ -122,7 +122,7 @@ class Binning(BaseEstimator, TransformerMixin):
             interval = enumerate([rule[i:i + 2] for i in range(length - 1)])
             # the first interval is close on both ends
             interval = ['[' + ', '.join(map(str, j)) + ')' for i, j in interval]   
-            interval = ['(-inf, {})'.format(min(rule))] + interval + ['({}, inf)'.format(max(rule))]
+            interval = ['(-inf, {})'.format(min(rule))] + interval + ['[{}, inf)'.format(max(rule))]
             mapping = dict(enumerate(interval))
             mapping[self.fill] = 'MISSING'
             return mapping

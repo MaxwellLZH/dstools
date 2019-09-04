@@ -314,7 +314,7 @@ class ChiSquareBinning(Binning):
             group = defaultdict(list)
             for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
                 group[i].append(v)
-            group = {k: ', '.join(map(str, v)) for k, v in group.items()}
+            group = {k: '[' + ', '.join(map(str, v)) + ']' for k, v in group.items()}
             group[0] = 'UNSEEN'
             return group
         else:
