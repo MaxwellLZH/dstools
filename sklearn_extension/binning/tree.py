@@ -6,7 +6,7 @@ import operator
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
-from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_numeric_dtype, is_number
 import warnings
 
 
@@ -95,7 +95,8 @@ class TreeBinner(BaseEstimator, TransformerMixin):
         :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
         :param bins: Maximum number of bins to split into
         :param categorical_cols: A list of categorical columns
-        :param min_frac: Minimum fraction of samples within each bin
+        :param min_frac: A float incdicating the minimum fraction of samples within each bin or 
+                A mapping from column name to its own minimum fraction
         :param fill: Value used for inputing missing value
         :param random_state: Random state used for growing trees
 
@@ -142,8 +143,9 @@ class TreeBinner(BaseEstimator, TransformerMixin):
             self.min_[X.name], self.max_[X.name] = X.min(), X.max() 
             
         X, y = self._drop_na(X, y)
+        min_frac = self.min_frac if is_number(self.min_frac) else self.min_frac[X.name]
         DT = DecisionTreeClassifier(max_leaf_nodes=self.bins,
-                                    min_samples_leaf=self.min_frac, 
+                                    min_samples_leaf=min_frac, 
                                     random_state=self.random_state)
         DT.fit(X.to_frame(), y)
         return parse_tree(DT.tree_), DT

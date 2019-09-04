@@ -1,7 +1,6 @@
 from sklearn.exceptions import NotFittedError
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
-import numpy as np
+from pandas.api.types import is_numeric_dtype, is_number
 import numpy as np
 from collections import defaultdict
 from typing import Dict, Iterable, Tuple, List
@@ -50,7 +49,7 @@ class ChiSquareBinning(Binning):
         :param prebin_method: A string, indicating which binner is used for prebinning. 'tree' for
                 TreeBinner and 'equal_freq` for using equal frequency binning.
         :param min_frac: Minimum fraction of samples within each bin. Only supported when the prebin_method
-                is 'tree'.
+                is 'tree'. Either a float or a mapping from column name to its minimum fraction
 
         Usage:
         --------------
@@ -248,7 +247,8 @@ class ChiSquareBinning(Binning):
         # speed up the process with prebinning
         if self.prebin and n_bins > self.prebin:
             if self.prebin_method.lower() == 'tree':
-                X, _ = tree_binning(X, y, n=self.prebin, min_frac=self.min_frac, 
+                min_frac = self.min_frac if is_number(self.min_frac) else self.min_frac[X.name]
+                X, _ = tree_binning(X, y, n=self.prebin, min_frac=min_frac, 
                                     encode=False, random_state=1024)
             elif self.prebin_method.lower() == 'equal_freq':
                 X, _ = equal_frequency_binning(X, n=self.prebin, encode=False)
