@@ -27,6 +27,7 @@ class ChiSquareBinning(Binning):
                  fill: int = -1,
                  force_monotonic: bool = True,
                  force_mix_label: bool = True,
+                 min_interval_size: float = 0.02,
                  strict: bool = True,
                  ignore_na: bool = True,
                  prebin: int = 100,
@@ -43,6 +44,7 @@ class ChiSquareBinning(Binning):
         :param force_monotonic:  Whether to force the bins to be monotonic with the
                 positive proportion of the label
         :param force_mix_label:  Whether to force all the bins to have mix labels
+        :param min_interval_size: The minimum percentage of samples within a single interval
         :param strict: If set to True, equal values will not be treated as monotonic
         :param ignore_na: The monotonicity check will ignore missing value
         :param prebin: An integer, number of bins to split into before the chimerge process.
@@ -66,6 +68,7 @@ class ChiSquareBinning(Binning):
         self.bin_cat_cols = bin_cat_cols
         self.force_monotonic = force_monotonic
         self.force_mix_label = force_mix_label
+        self.min_interval_size = min_interval_size
         self.strict = strict
         self.ignore_na = ignore_na
 
@@ -186,6 +189,33 @@ class ChiSquareBinning(Binning):
         small, large = candidate_pairs[min_idx]
         return self.merge_bin(mapping, small, large)
 
+    def merge_interval_size(self, mapping: Dict[int, list], min_samples: int) -> Dict[int, list]:
+        """ Performs a single merge trying to merge bins that have fewer samples 
+            than self.min_inteval_size
+        """
+        # convert to list so we don't get error modifying dictionary during loop
+        for k in sorted(list(mapping.keys())):
+            n_sample = len(mapping[k])
+
+            if n_sample < min_samples:
+                merge_candidates = self.find_candidate(mapping.keys(), k)
+
+                # merge to the neighbour interval with fewer samples
+                if len(merge_candidates) == 1:
+                    return self.merge_bin(mapping, merge_candidates[0], k), False
+                else:
+                    left_cand, right_cand = merge_candidates
+                    n_left, n_right = len(mapping[left_cand]), len(mapping[right_cand])
+
+                    if n_left < n_right:
+                        return self.merge_bin(mapping, left_cand, k), False
+                    elif n_left > n_right:
+                        return self.merge_bin(mapping, right_cand, k), False
+                    else:
+                        return self.merge_chisquare(mapping, [left_cand, k, right_cand]), False
+        else:
+            return mapping, True
+
     def merge_purity(self, mapping: Dict[int, list]) -> Tuple[Dict[int, list], bool]:
         """ Performs a single merge trying to merge bins with only 0 or a label into the adjacent mixed label bin
             Return the updated mapping and a purity label
@@ -289,6 +319,17 @@ class ChiSquareBinning(Binning):
         if self.force_monotonic:
             while len(mapping) > 2 and not self.is_monotonic_post_bin(mapping):
                 mapping = self.merge_chisquare(mapping)
+
+        # merge bins to meet the minimum sample size for each interval
+        if self.min_interval_size > 0:
+            if self.min_interval_size <= 1:
+                min_interval_size = self.min_interval_size * X.notnull().sum()
+            else:
+                min_interval_size = self.min_interval_size
+
+            meet_interval_size = False
+            while not meet_interval_size and len(mapping) > 2:
+                mapping, meet_interval_size = self.merge_interval_size(mapping, min_interval_size)
 
         # clean up the cache
         self._chisquare_cache = dict()
