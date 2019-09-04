@@ -135,3 +135,20 @@ class Binning(BaseEstimator, TransformerMixin):
             mapping[self.fill] = 'MISSING'
             mapping[0] = 'UNSEEN'
             return mapping
+
+    def get_bin_stats(self, X: pd.Series, y):
+        """ Generate summary for a Series """
+        col = X.name
+        if col not in self.bins:
+            raise ValueError('Column {} does not present during the fit process.'.format(col))
+
+        encoded = pd.Series(self._transform(X)).map(self.get_interval_mapping(col))
+        stats = pd.Series(y).groupby(encoded).agg({'pct_pos': 'mean',
+                                                    'n_pos': 'sum',
+                                                    'n_sample': 'count'})
+        stats['n_neg'] = stats['n_sample'] - stats['n_pos']
+        stats['pct_neg'] = stats['n_neg'] / stats['n_sample']
+        stats['pct_sample'] = stats['n_sample'] / len(y)
+        stats.index.name = col
+        # reorder columns
+        return stats[['n_pos', 'pct_pos', 'n_neg', 'pct_neg', 'n_sample', 'pct_sample']]
