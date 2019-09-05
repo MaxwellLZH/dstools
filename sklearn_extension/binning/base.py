@@ -142,7 +142,8 @@ class Binning(BaseEstimator, TransformerMixin):
         if col not in self.bins:
             raise ValueError('Column {} does not present during the fit process.'.format(col))
 
-        encoded = pd.Series(self._transform(X)).map(self.get_interval_mapping(col))
+        encoded = self.transform(X.to_frame())[col]
+        encoded = encoded.map(self.get_interval_mapping(col))
         stats = pd.Series(y).groupby(encoded).agg({'pct_pos': 'mean',
                                                     'n_pos': 'sum',
                                                     'n_sample': 'count'})

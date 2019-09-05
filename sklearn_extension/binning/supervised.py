@@ -32,7 +32,7 @@ class ChiSquareBinning(Binning):
                  ignore_na: bool = True,
                  prebin: int = 100,
                  prebin_method: str = 'tree',
-                 min_frac=0.02):
+                 min_frac=0.01):
         """
         :param max_bin: The number of bins to split into
         :param cols: A list of columns to perform binning, if set to None, perform binning on all columns.
@@ -303,11 +303,11 @@ class ChiSquareBinning(Binning):
         if self.expected_ratio == 0 or self.expected_ratio == 1:
             return [-np.inf]
 
-        n_bins = len(mapping) - 1
+        n_bins = len(mapping)
         # merge bins based on chi square
         while n_bins > self.max_bin:
             mapping = self.merge_chisquare(mapping)
-            n_bins = len(mapping) - 1
+            n_bins = len(mapping)
 
         # merge bins to create mixed label in every bin
         if self.force_mix_label and n_bins > 1:

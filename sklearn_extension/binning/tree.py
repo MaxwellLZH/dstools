@@ -184,8 +184,10 @@ class TreeBinner(BaseEstimator, TransformerMixin):
             # create a mapping from interval index to edge value
             # edge left is only used for the leftmost node (where Interval.left == -np.inf)
             _min, _max = self.min_[col_name], self.max_[col_name]
-            cutoff_mapping = {i: _min if j.left == -np.inf else min(_max, j.right)
-                                for i, j in enumerate(self.interval_mapping[col_name])}
+            # cutoff_mapping = {i: _min if j.left == -np.inf else min(_max, j.right)
+            #                     for i, j in enumerate(self.interval_mapping[col_name])}
+            cutoff_mapping = {i: _min if j.left == -np.inf else j.left 
+                                for i, j in enumerate(self.interval_mapping[col_name])} 
             X[valid_index] = X[valid_index].map(cutoff_mapping)
             # leave NaN unfilled if self.encode is False
             return X
