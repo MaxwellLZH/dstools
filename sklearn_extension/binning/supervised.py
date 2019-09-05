@@ -189,6 +189,16 @@ class ChiSquareBinning(Binning):
         small, large = candidate_pairs[min_idx]
         return self.merge_bin(mapping, small, large)
 
+    def merge_monotonic(self, mapping: Dict[int, list]) -> Dict[int, list]:
+        """ Performs a single chimerge and check the monotonicity afterwards
+            Prefer to merge the bins with smaller sample size 
+        """
+        # pick the bin with smallest sample size
+        k = sorted([(len(v), k) for k, v in mapping.items()])[0][1]
+        merge_candidates = self.find_candidate(mapping.keys(), k)
+        mapping = self.merge_chisquare(mapping, merge_candidates + [k])
+        return mapping
+        
     def merge_interval_size(self, mapping: Dict[int, list], min_samples: int) -> Dict[int, list]:
         """ Performs a single merge trying to merge bins that have fewer samples 
             than self.min_inteval_size
@@ -318,7 +328,8 @@ class ChiSquareBinning(Binning):
         # merge bins to keep bins to be monotonic
         if self.force_monotonic:
             while len(mapping) > 2 and not self.is_monotonic_post_bin(mapping):
-                mapping = self.merge_chisquare(mapping)
+                # mapping = self.merge_chisquare(mapping)
+                mapping = self.merge_monotonic(mapping)
 
         # merge bins to meet the minimum sample size for each interval
         if self.min_interval_size > 0:
