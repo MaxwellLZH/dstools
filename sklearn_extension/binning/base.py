@@ -151,5 +151,6 @@ class Binning(BaseEstimator, TransformerMixin):
         stats['pct_neg'] = stats['n_neg'] / stats['n_sample']
         stats['pct_sample'] = stats['n_sample'] / len(y)
         stats.index.name = col
+
         # reorder columns
         return stats[['n_pos', 'pct_pos', 'n_neg', 'pct_neg', 'n_sample', 'pct_sample']]
