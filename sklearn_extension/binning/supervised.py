@@ -376,26 +376,10 @@ class ChiSquareBinning(Binning):
         """ Improve formatting by sorting the intervals """
         col = X.name
 
-        def get_left_edge(v):
-            if v == 'MISSING':
-                return -1
-            elif v == 'UNSEEN':
-                return -2
-            else:
-                left_edge = v.split(',')[0][1:]
-                if left_edge == '-inf':
-                    return -np.inf
-                else:
-                    return float(left_edge)
-
-        stats = super().get_bin_stats(X, y)
-        
         if col in self.categorical_cols:
-            return stats
+            return super().get_bin_stats(X, y, sort=False)
         else:
-            stats['_order'] = stats.index.map(get_left_edge)
-            return stats.sort_values('_order').drop('_order', axis=1)
-
+            return super().get_bin_stats(X, y, sort=True)
 
 
 

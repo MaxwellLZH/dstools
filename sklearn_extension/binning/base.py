@@ -136,7 +136,7 @@ class Binning(BaseEstimator, TransformerMixin):
             mapping[0] = 'UNSEEN'
             return mapping
 
-    def get_bin_stats(self, X: pd.Series, y):
+    def get_bin_stats(self, X: pd.Series, y, sort=True):
         """ Generate summary for a Series """
         col = X.name
         if col not in self.bins:
@@ -151,6 +151,22 @@ class Binning(BaseEstimator, TransformerMixin):
         stats['pct_neg'] = stats['n_neg'] / stats['n_sample']
         stats['pct_sample'] = stats['n_sample'] / len(y)
         stats.index.name = col
+        stats = stats[['n_pos', 'pct_pos', 'n_neg', 'pct_neg', 'n_sample', 'pct_sample']]
 
-        # reorder columns
-        return stats[['n_pos', 'pct_pos', 'n_neg', 'pct_neg', 'n_sample', 'pct_sample']]
+        def get_left_edge(v):
+            if v == 'MISSING':
+                return -1
+            elif v == 'UNSEEN':
+                return -2
+            else:
+                left_edge = v.split(',')[0][1:]
+                if left_edge == '-inf':
+                    return -np.inf
+                else:
+                    return float(left_edge)
+
+        if sort:
+            stats['_order'] = stats.index.map(get_left_edge)
+            return stats.sort_values('_order').drop('_order', axis=1)
+        else:
+            return stats
