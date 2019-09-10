@@ -7,6 +7,7 @@ __all__ = [
     'Binning',
     'TreeBinner',
     'ChiSquareBinning',
+    'KSBinning',
     'EqualWidthBinning',
     'EqualFrequencyBinning',
     'equal_width_binning',

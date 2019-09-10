@@ -1,7 +1,9 @@
 from sklearn.exceptions import NotFittedError
 import pandas as pd
-from pandas.api.types import is_numeric_dtype, is_number
 import numpy as np
+from pandas.api.types import is_numeric_dtype, is_number
+import bisect
+import functools
 from collections import defaultdict
 from typing import Dict, Iterable, Tuple, List
 
@@ -12,10 +14,293 @@ from .unsupervised import equal_frequency_binning
 from .tree import TreeBinner, tree_binning
 
 
-__all__ = ['ChiSquareBinning', 'TreeBinner']
+__all__ = ['ChiSquareBinning', 'KSBinning', 'TreeBinner']
 
 
-class ChiSquareBinning(Binning):
+def sorted_two_gram(X):
+    """ Two gram with the left element smaller than the right element in each pair
+        eg. sorted_two_gram([1, 3, 2]) -> [(1, 2), (2, 3)]
+    """
+    unique_values = sorted(X)
+    return [(unique_values[i], unique_values[i + 1])
+            for i in range(len(unique_values) - 1)]
+
+
+def is_monotonic(i, strict=True, ignore_na=True) -> bool:
+    """ Check if an iterable is monotonic """
+    i = make_series(i)
+    diff = i.diff()[1:]
+    if ignore_na:
+        diff = diff[diff.notnull()]
+    sign = diff > 0 if strict else diff >= 0
+    if sign.sum() == 0 or (~sign).sum() == 0:
+        return True
+    return False
+
+
+class SupervisedBinning(Binning):
+
+    def __init__(self,
+                 cols: list = None,
+                 bins: dict = None,
+                 categorical_cols: list = None,
+                 encode: bool = True,
+                 fill: int = -1):
+        super().__init__(cols, bins, encode, fill)
+
+        self.categorical_cols = categorical_cols
+        # mapping for discrete variables
+        self.discrete_encoding = dict()
+
+    def encode_with_label(self, X: pd.Series, y: pd.Series) -> pd.Series:
+        """ Encode categorical features with its percentage of positive samples"""
+        X, y = make_series(X), make_series(y)
+        pct_pos = y.groupby(X).mean()
+        # save the mapping for transform()
+        self.discrete_encoding[X.name] = pct_pos
+        return X.map(pct_pos)
+
+    def get_interval_mapping(self, col_name: str):
+        """ Get the mapping from encoded value to its corresponding group. """
+        if self.bins is None:
+            raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
+
+        if col_name in self.discrete_encoding and isinstance(self.bins[col_name], list):
+            # categorical columns
+            encoding = self.discrete_encoding[col_name]
+            group = defaultdict(list)
+            for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
+                group[i].append(v)
+            group = {k: '[' + ', '.join(map(str, v)) + ']' for k, v in group.items()}
+            group[0] = 'UNSEEN'
+            return group
+        else:
+            return super().get_interval_mapping(col_name)
+
+    def _transform(self, X: pd.Series, y=None):
+        """ Transform a single feature"""
+        # map discrete value to its corresponding percentage of positive samples
+        col_name = X.name
+        if col_name in self.discrete_encoding:
+            # if the a new category is encountered, leave it as missing
+            X = X.map(self.discrete_encoding[col_name])
+        return super()._transform(X, y)
+
+    def get_interval_mapping(self, col_name: str):
+        """ Get the mapping from encoded value to its corresponding group. """
+        if self.bins is None:
+            raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
+
+        if col_name in self.discrete_encoding and isinstance(self.bins[col_name], list):
+            # categorical columns
+            encoding = self.discrete_encoding[col_name]
+            group = defaultdict(list)
+            for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
+                group[i].append(v)
+            group = {k: '[' + ', '.join(map(str, v)) + ']' for k, v in group.items()}
+            group[0] = 'UNSEEN'
+            return group
+        else:
+            return super().get_interval_mapping(col_name)
+
+    def get_bin_stats(self, X: pd.Series, y):
+        """ Improve formatting by sorting the intervals """
+        col = X.name
+
+        if col in self.categorical_cols:
+            return super().get_bin_stats(X, y, sort=False)
+        else:
+            return super().get_bin_stats(X, y, sort=True)
+
+
+class CumulativeCounter:
+    """ Keep tracks of the cumulative number of samples and positive samples """
+    
+    def __init__(self, X: pd.Series, y: pd.Series, bins=None):
+        self.name = X.name
+        self.total_sample_with_null = len(X)
+        self.total_sample = X.notnull().sum()
+        self.total_pos = y[X.notnull()].sum()
+        self.total_neg = self.total_sample - self.total_pos
+        
+        self.mapping = dict()
+        if bins is None:
+            values = X[X.notnull()].unique()
+        else:
+            values = pd.qcut(X, q=bins, duplicates='drop', retbins=True)[1]
+            
+        for v in values:
+            # the last interval should be right closed
+            smaller = X < v if v != X.max() else X <= v
+            n_sample = smaller.sum()
+            n_pos = y[smaller].sum()
+            self.mapping[v] = (n_sample, n_pos)
+            
+    def __getitem__(self, key):
+        return self.mapping[key]
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+    def __hash__(self):
+        return hash(self.name)
+            
+    def keys(self):
+        return sorted(self.mapping.keys())
+    
+    def iter_keys(self, drop_first=True, drop_last=True):
+        start = 0 + int(drop_first)
+        end = len(self.mapping) - int(drop_last)
+        for key in self.keys()[start:end]:
+            yield key
+    
+    def iter_neighbour_keys(self):
+        return sorted_two_gram(self.mapping.keys())
+    
+    def pct_pos_lt_key(self, key):
+        """ Percentage of positive samples when less than given key """
+        n, n_pos = self[key]
+        return n_pos / n
+    
+    def pct_pos_ge_key(self, key):
+        """ Percentage of positive samples when larger or equal than given key """
+        n, n_pos = self[key]
+        n, n_pos = self.total_sample - n, self.total_pos - n_pos
+        return n_pos / n
+    
+    def pct_pos_between_keys(self, k1, k2):
+        """ Percentage of positive samples when k1 <= key < k2. """
+        n_1, n_pos_1 = self[k1]
+        n_2, n_pos_2 = self[k2]
+        return (n_pos_2 - n_pos_1) / (n_2 - n_1)
+
+    def n_sample_between_keys(self, k1, k2):
+        """ Number of samples when k1 <= key < k2 """
+        n_1, _ = self[k1]
+        n_2, _ = self[k2]
+        return n_2 - n_1
+    
+    def pct_pos_given_cutoffs(self, cutoffs):
+        """ Return the positive percentage within each interval """
+        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
+        return [self.pct_pos_between_keys(k1, k2) \
+                    for k1, k2 in sorted_two_gram(cutoffs)]
+    
+    def n_sample_given_cutoffs(self, cutoffs):
+        """ Return number of samples within each interval """
+        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
+        return [self.n_sample_between_keys(k1, k2) \
+                    for k1, k2 in sorted_two_gram(cutoffs)]
+
+
+class KSBinning(SupervisedBinning):
+
+    def __init__(self,
+                max_bin: int,
+                cols: list=None,
+                bins: dict=None,
+                categorical_cols: list = None,
+                bin_cat_cols: bool = True,
+                encode: bool = True,
+                fill: int = -1,
+                force_monotonic: bool = True,
+                force_mix_label: bool = True,
+                min_interval_size: float = 0.02,
+                prebin: int = 100):
+        super().__init__(cols, bins, categorical_cols, encode, fill)
+        self.max_bin = max_bin
+        self.bin_cat_cols = bin_cat_cols
+        self.force_monotonic = force_monotonic
+        self.force_mix_label = force_mix_label
+        self.min_interval_size = min_interval_size
+        self.prebin = prebin
+
+    @staticmethod
+    def ks_score(counter: CumulativeCounter, cutoffs):
+        def _diff(counter, cutoff):
+            n_sample, n_pos = counter[cutoff]
+            n_neg = n_sample - n_pos
+            total_neg = counter.total_sample - counter.total_pos
+
+            pct_pos = n_pos / counter.total_pos
+            pct_neg = n_neg / counter.total_neg
+            return abs(pct_pos - pct_neg)
+        return max([_diff(counter, i) for i in cutoffs])
+
+    def _find_single_split(self, counter: CumulativeCounter, cutoffs: list) -> Tuple[list, bool]:     
+        next_split, best_ks = None, -1
+        for v in counter.iter_keys(drop_first=True, drop_last=True):
+            # already in the cutoff
+            if v in cutoffs:
+                continue
+
+            # make a copy
+            candidate_cutoffs = cutoffs[:]
+            bisect.insort(candidate_cutoffs, v)
+
+            # check the minimum samples within each bin
+            # min_sample_per_bin = int(self.min_interval_size * counter.total_sample)
+            min_sample_per_bin = int(self.min_interval_size * counter.total_sample_with_null)
+
+            # early stop when min_interval_size == 0
+            if min_sample_per_bin > 0 and any(i < min_sample_per_bin \
+                                    for i in counter.n_sample_given_cutoffs(candidate_cutoffs)):
+                continue
+
+            # check the positive percentage within each bin
+            pct_pos_bin = counter.pct_pos_given_cutoffs(candidate_cutoffs)
+            if self.force_monotonic and not is_monotonic(pct_pos_bin):
+                continue
+
+            if self.force_mix_label and (max(pct_pos_bin) == 1 or min(pct_pos_bin) == 0):
+                continue
+
+            cur_ks = self.ks_score(counter, candidate_cutoffs)
+            if cur_ks > best_ks:
+                best_ks, next_split = cur_ks, v
+
+        if next_split is not None:
+            bisect.insort(cutoffs, next_split)
+            return cutoffs, True
+        else:
+            return cutoffs, False
+
+
+    def _fit(self, X, y, **fit_parmas):
+        """ Fit a single feature and return the cutoff points"""
+        self.categorical_cols = self.categorical_cols or []
+
+        if not is_numeric_dtype(X) and X.name not in self.categorical_cols:
+            raise ValueError('Column {} is not numeric and not in categorical_cols.'.format(X.name))
+
+        y = force_zero_one(y)
+        X, y = make_series(X), make_series(y)
+
+        # if X is discrete, encode with positive ratio in y
+        if X.name in self.categorical_cols:
+            # the categorical columns will remain unchanged if
+            # we turn off  bin_cat_cols
+            if not self.bin_cat_cols:
+                return None
+            X = self.encode_with_label(X, y)
+
+        n_bins = X.nunique()
+        if n_bins < self.max_bin:
+            return None
+
+        # create the counter and initialize cutoff points
+        # also create a flag indicating whether the binning process should stop
+        counter = CumulativeCounter(X, y, bins=self.prebin if n_bins > self.prebin else None)
+        cutoffs = list()
+        continue_flag = True
+
+        while continue_flag and len(cutoffs) + 1 < self.max_bin:
+            cutoffs, continue_flag = self._find_single_split(counter, cutoffs) 
+
+        return [X.min()] + cutoffs
+
+
+class ChiSquareBinning(SupervisedBinning):
 
     def __init__(self,
                  max_bin: int,
@@ -62,9 +347,8 @@ class ChiSquareBinning(Binning):
         >>> encoded = CB.fit_transform(X, y)
         >>> CB.bins # get the cutoff points
         """
-        super().__init__(cols, bins, encode, fill)
+        super().__init__(cols, bins, categorical_cols, encode, fill)
         self.max_bin = max_bin
-        self.categorical_cols = categorical_cols
         self.bin_cat_cols = bin_cat_cols
         self.force_monotonic = force_monotonic
         self.force_mix_label = force_mix_label
@@ -76,8 +360,6 @@ class ChiSquareBinning(Binning):
         self.prebin_method = prebin_method
         self.min_frac = min_frac
 
-        # mapping for discrete variables
-        self.discrete_encoding = dict()
         self._chisquare_cache = dict()
 
     def calculate_chisquare(self, mapping: Dict[int, list], candidates: Iterable) -> float:
@@ -101,27 +383,6 @@ class ChiSquareBinning(Binning):
         chi2 = chi2 / dgfd
         self._chisquare_cache[unique_x] = chi2
         return chi2
-
-    @staticmethod
-    def sorted_two_gram(X):
-        """ Two gram with the left element smaller than the right element in each pair
-            eg. sorted_two_gram([1, 3, 2]) -> [(1, 2), (2, 3)]
-        """
-        unique_values = sorted(X)
-        return [(unique_values[i], unique_values[i + 1])
-                for i in range(len(unique_values) - 1)]
-
-    @staticmethod
-    def is_monotonic(i, strict=True, ignore_na=True) -> bool:
-        """ Check if an iterable is monotonic """
-        i = make_series(i)
-        diff = i.diff()[1:]
-        if ignore_na:
-            diff = diff[diff.notnull()]
-        sign = diff > 0 if strict else diff >= 0
-        if sign.sum() == 0 or (~sign).sum() == 0:
-            return True
-        return False
 
     @staticmethod
     def find_candidate(values: Iterable, target: int) -> list:
@@ -345,42 +606,6 @@ class ChiSquareBinning(Binning):
         # clean up the cache
         self._chisquare_cache = dict()
         return mapping.keys()
-
-    def _transform(self, X: pd.Series, y=None):
-        """ Transform a single feature"""
-        # map discrete value to its corresponding percentage of positive samples
-        col_name = X.name
-        if col_name in self.discrete_encoding:
-            # if the a new category is encountered, leave it as missing
-            X = X.map(self.discrete_encoding[col_name])
-        return super()._transform(X, y)
-
-    def get_interval_mapping(self, col_name: str):
-        """ Get the mapping from encoded value to its corresponding group. """
-        if self.bins is None:
-            raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
-
-        if col_name in self.discrete_encoding and isinstance(self.bins[col_name], list):
-            # categorical columns
-            encoding = self.discrete_encoding[col_name]
-            group = defaultdict(list)
-            for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
-                group[i].append(v)
-            group = {k: '[' + ', '.join(map(str, v)) + ']' for k, v in group.items()}
-            group[0] = 'UNSEEN'
-            return group
-        else:
-            return super().get_interval_mapping(col_name)
-
-    def get_bin_stats(self, X: pd.Series, y):
-        """ Improve formatting by sorting the intervals """
-        col = X.name
-
-        if col in self.categorical_cols:
-            return super().get_bin_stats(X, y, sort=False)
-        else:
-            return super().get_bin_stats(X, y, sort=True)
-
 
 
 if __name__ == '__main__':
