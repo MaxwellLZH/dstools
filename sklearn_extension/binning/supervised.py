@@ -14,7 +14,7 @@ from .unsupervised import equal_frequency_binning
 from .tree import TreeBinner, tree_binning
 
 
-__all__ = ['ChiSquareBinning', 'KSBinning', 'TreeBinner']
+__all__ = ['ChiSquareBinning', 'KSBinning', 'EntropyBinning', 'IVBinning', 'TreeBinner']
 
 
 def sorted_two_gram(X):
@@ -36,6 +36,133 @@ def is_monotonic(i, strict=True, ignore_na=True) -> bool:
     if sign.sum() == 0 or (~sign).sum() == 0:
         return True
     return False
+
+
+
+class CumulativeCounter:
+    """ Keep tracks of the cumulative number of samples and positive samples """
+    
+    def __init__(self, X: pd.Series, y: pd.Series, bins=None):
+        self.name = X.name
+        self.total_sample_with_null = len(X)
+        self.total_sample = X.notnull().sum()
+        self.total_pos = y[X.notnull()].sum()
+        self.total_neg = self.total_sample - self.total_pos
+        
+        self.mapping = dict()
+        if bins is None:
+            values = X[X.notnull()].unique()
+        else:
+            values = pd.qcut(X, q=bins, duplicates='drop', retbins=True)[1]
+            
+        for v in values:
+            # the last interval should be right closed
+            smaller = X < v if v != X.max() else X <= v
+            n_sample = smaller.sum()
+            n_pos = y[smaller].sum()
+            self.mapping[v] = (n_sample, n_pos)
+            
+    def __getitem__(self, key):
+        return self.mapping[key]
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+    def __hash__(self):
+        return hash(self.name)
+            
+    def keys(self):
+        return sorted(self.mapping.keys())
+    
+    def iter_keys(self, drop_first=True, drop_last=True):
+        start = 0 + int(drop_first)
+        end = len(self.mapping) - int(drop_last)
+        for key in self.keys()[start:end]:
+            yield key
+    
+    def iter_neighbour_keys(self):
+        return sorted_two_gram(self.mapping.keys())
+    
+    def pct_pos_lt_key(self, key):
+        """ Percentage of positive samples when less than given key """
+        n, n_pos = self[key]
+        return n_pos / n
+    
+    def pct_pos_ge_key(self, key):
+        """ Percentage of positive samples when larger or equal than given key """
+        n, n_pos = self[key]
+        n, n_pos = self.total_sample - n, self.total_pos - n_pos
+        return n_pos / n
+    
+    def pct_pos_between_keys(self, k1, k2):
+        """ Percentage of positive samples when k1 <= key < k2. """
+        n_1, n_pos_1 = self[k1]
+        n_2, n_pos_2 = self[k2]
+        return (n_pos_2 - n_pos_1) / (n_2 - n_1)
+
+    def n_sample_between_keys(self, k1, k2):
+        """ Number of samples when k1 <= key < k2 """
+        n_1, _ = self[k1]
+        n_2, _ = self[k2]
+        return n_2 - n_1
+
+    def n_positive_sample_between_keys(self, k1, k2):
+        _, n_pos_1 = self[k1]
+        _, n_pos_2 = self[k2]
+        return n_pos_2 - n_pos_1
+
+    def entropy_between_keys(self, k1, k2):
+        pct_pos = self.pct_pos_between_keys(k1, k2)
+        pct_neg = 1 - pct_pos
+        return -np.sum([p * np.log2(p) if p > 0 else 0 for p in [pct_pos, pct_neg]])
+
+    def woe_between_keys(self, k1, k2):
+        n_1, n_pos_1 = self[k1]
+        n_2, n_pos_2 = self[k2]
+
+        n_sample, n_pos = n_2 - n_1, n_pos_2 - n_pos_1
+        pct_pos = n_pos / self.total_pos
+        pct_neg = (n_sample - n_pos) / self.total_neg
+        pct_pos, pct_neg = np.clip([pct_pos, pct_neg], a_min=1e-10, a_max=1 - 1e-10)
+        return np.log(pct_pos / pct_neg)
+
+    def iv_between_keys(self, k1, k2):
+        n_1, n_pos_1 = self[k1]
+        n_2, n_pos_2 = self[k2]
+
+        n_sample, n_pos = n_2 - n_1, n_pos_2 - n_pos_1
+        pct_pos = n_pos / self.total_pos
+        pct_neg = (n_sample - n_pos) / self.total_neg
+        pct_pos, pct_neg = np.clip([pct_pos, pct_neg], a_min=1e-10, a_max=1 - 1e-10)
+        return (pct_pos - pct_neg) * np.log(pct_pos / pct_neg)
+    
+    def pct_pos_given_cutoffs(self, cutoffs):
+        """ Return the positive percentage within each interval """
+        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
+        return [self.pct_pos_between_keys(k1, k2) \
+                    for k1, k2 in sorted_two_gram(cutoffs)]
+    
+    def n_sample_given_cutoffs(self, cutoffs):
+        """ Return number of samples within each interval """
+        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
+        return [self.n_sample_between_keys(k1, k2) \
+                    for k1, k2 in sorted_two_gram(cutoffs)]
+
+    def entropy_given_cutoffs(self, cutoffs):
+        """ Return the weighted sum of entropy for all the intervals """
+        weight = np.array(self.n_sample_given_cutoffs(cutoffs))
+        weight = weight / weight.sum()
+
+        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
+        bin_entropy = np.array([self.entropy_between_keys(k1, k2) \
+                            for k1, k2 in sorted_two_gram(cutoffs)])
+        return (weight * bin_entropy).sum()
+
+    def iv_given_cutoffs(self, cutoffs):
+        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
+        return sum([self.iv_between_keys(k1, k2) \
+                    for k1, k2 in sorted_two_gram(cutoffs)])
+
 
 
 class SupervisedBinning(Binning):
@@ -113,103 +240,14 @@ class SupervisedBinning(Binning):
             return super().get_bin_stats(X, y, sort=True)
 
 
-class CumulativeCounter:
-    """ Keep tracks of the cumulative number of samples and positive samples """
-    
-    def __init__(self, X: pd.Series, y: pd.Series, bins=None):
-        self.name = X.name
-        self.total_sample_with_null = len(X)
-        self.total_sample = X.notnull().sum()
-        self.total_pos = y[X.notnull()].sum()
-        self.total_neg = self.total_sample - self.total_pos
-        
-        self.mapping = dict()
-        if bins is None:
-            values = X[X.notnull()].unique()
-        else:
-            values = pd.qcut(X, q=bins, duplicates='drop', retbins=True)[1]
-            
-        for v in values:
-            # the last interval should be right closed
-            smaller = X < v if v != X.max() else X <= v
-            n_sample = smaller.sum()
-            n_pos = y[smaller].sum()
-            self.mapping[v] = (n_sample, n_pos)
-            
-    def __getitem__(self, key):
-        return self.mapping[key]
 
-    def __eq__(self, other):
-        return self.name == other.name
-
-    def __hash__(self):
-        return hash(self.name)
-            
-    def keys(self):
-        return sorted(self.mapping.keys())
+class TopDownBinning(SupervisedBinning):
+    """ Base class for supervised binning via top down splits """
     
-    def iter_keys(self, drop_first=True, drop_last=True):
-        start = 0 + int(drop_first)
-        end = len(self.mapping) - int(drop_last)
-        for key in self.keys()[start:end]:
-            yield key
-    
-    def iter_neighbour_keys(self):
-        return sorted_two_gram(self.mapping.keys())
-    
-    def pct_pos_lt_key(self, key):
-        """ Percentage of positive samples when less than given key """
-        n, n_pos = self[key]
-        return n_pos / n
-    
-    def pct_pos_ge_key(self, key):
-        """ Percentage of positive samples when larger or equal than given key """
-        n, n_pos = self[key]
-        n, n_pos = self.total_sample - n, self.total_pos - n_pos
-        return n_pos / n
-    
-    def pct_pos_between_keys(self, k1, k2):
-        """ Percentage of positive samples when k1 <= key < k2. """
-        n_1, n_pos_1 = self[k1]
-        n_2, n_pos_2 = self[k2]
-        return (n_pos_2 - n_pos_1) / (n_2 - n_1)
-
-    def n_sample_between_keys(self, k1, k2):
-        """ Number of samples when k1 <= key < k2 """
-        n_1, _ = self[k1]
-        n_2, _ = self[k2]
-        return n_2 - n_1
-
-    def entropy_between_keys(self, k1, k2):
-        pct_pos = self.pct_pos_between_keys(k1, k2)
-        pct_neg = 1 - pct_pos
-        return -np.sum([p * np.log2(p) for p in [pct_pos, pct_neg] if p > 0])
-    
-    def pct_pos_given_cutoffs(self, cutoffs):
-        """ Return the positive percentage within each interval """
-        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
-        return [self.pct_pos_between_keys(k1, k2) \
-                    for k1, k2 in sorted_two_gram(cutoffs)]
-    
-    def n_sample_given_cutoffs(self, cutoffs):
-        """ Return number of samples within each interval """
-        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
-        return [self.n_sample_between_keys(k1, k2) \
-                    for k1, k2 in sorted_two_gram(cutoffs)]
-
-    def entropy_given_cutoffs(self, cutoffs):
-        """ Return the weighted sum of entropy for all the intervals """
-        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
-        
-        weight = np.array(self.n_sample_given_cutoffs(cutoffs))
-        weight = weight / weight.sum()
-
-        bin_entropy = np.array([self.entropy_between_keys(k1, k2) \
-                            for k1, k2 in sorted_two_gram(cutoffs)])
-        return (weight * bin_entropy).sum()
-
-
-class KSBinning(SupervisedBinning):
+    # a function to evaluate the cutoff
+    # it should take (cumulative counter, candidate cutoff, original cutoff)
+    # and return a metric that should be 
+    evaluate_cutoff = None
 
     def __init__(self,
                 max_bin: int,
@@ -231,20 +269,8 @@ class KSBinning(SupervisedBinning):
         self.min_interval_size = min_interval_size
         self.prebin = prebin
 
-    @staticmethod
-    def ks_score(counter: CumulativeCounter, cutoffs):
-        def _diff(counter, cutoff):
-            n_sample, n_pos = counter[cutoff]
-            n_neg = n_sample - n_pos
-            total_neg = counter.total_sample - counter.total_pos
-
-            pct_pos = n_pos / counter.total_pos
-            pct_neg = n_neg / counter.total_neg
-            return abs(pct_pos - pct_neg)
-        return max([_diff(counter, i) for i in cutoffs])
-
     def _find_single_split(self, counter: CumulativeCounter, cutoffs: list) -> Tuple[list, bool]:     
-        next_split, best_ks = None, -1
+        next_split, best_metric = None, -1
         for v in counter.iter_keys(drop_first=True, drop_last=True):
             # already in the cutoff
             if v in cutoffs:
@@ -271,9 +297,9 @@ class KSBinning(SupervisedBinning):
             if self.force_mix_label and (max(pct_pos_bin) == 1 or min(pct_pos_bin) == 0):
                 continue
 
-            cur_ks = self.ks_score(counter, candidate_cutoffs)
-            if cur_ks > best_ks:
-                best_ks, next_split = cur_ks, v
+            cur_metric = self.__class__.evaluate_cutoff(counter, candidate_cutoffs, cutoffs)
+            if cur_metric > best_metric:
+                best_metric, next_split = cur_metric, v
 
         if next_split is not None:
             bisect.insort(cutoffs, next_split)
@@ -314,6 +340,42 @@ class KSBinning(SupervisedBinning):
             cutoffs, continue_flag = self._find_single_split(counter, cutoffs) 
 
         return [X.min()] + cutoffs
+
+
+
+def _ks_score(counter: CumulativeCounter, candidate_cutoffs: list, cutoffs: list=None):
+    def _diff(counter, cutoff):
+        n_sample, n_pos = counter[cutoff]
+        n_neg = n_sample - n_pos
+        total_neg = counter.total_sample - counter.total_pos
+
+        pct_pos = n_pos / counter.total_pos
+        pct_neg = n_neg / counter.total_neg
+        return abs(pct_pos - pct_neg)
+    return max([_diff(counter, i) for i in candidate_cutoffs])
+
+
+class KSBinning(TopDownBinning):
+    evaluate_cutoff = _ks_score
+
+
+
+def _info_gain(counter: CumulativeCounter, candidate_cutoffs: list, cutoffs: list): 
+    return counter.entropy_given_cutoffs(candidate_cutoffs) - counter.entropy_given_cutoffs(cutoffs)
+
+
+class EntropyBinning(TopDownBinning):
+    evaluate_cutoff = _info_gain
+
+
+
+def _calc_iv(counter: CumulativeCounter, candidate_cutoffs: list, cutoffs: list=None):
+    return counter.iv_given_cutoffs(candidate_cutoffs)
+
+
+class IVBinning(TopDownBinning):
+    evaluate_cutoff = _calc_iv
+
 
 
 class ChiSquareBinning(SupervisedBinning):

@@ -8,6 +8,8 @@ __all__ = [
     'TreeBinner',
     'ChiSquareBinning',
     'KSBinning',
+    'IVBinning',
+    'EntropyBinning',
     'EqualWidthBinning',
     'EqualFrequencyBinning',
     'equal_width_binning',
