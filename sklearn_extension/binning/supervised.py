@@ -179,6 +179,11 @@ class CumulativeCounter:
         n_1, _ = self[k1]
         n_2, _ = self[k2]
         return n_2 - n_1
+
+    def entropy_between_keys(self, k1, k2):
+        pct_pos = self.pct_pos_between_keys(k1, k2)
+        pct_neg = 1 - pct_pos
+        return -np.sum([p * np.log2(p) for p in [pct_pos, pct_neg] if p > 0])
     
     def pct_pos_given_cutoffs(self, cutoffs):
         """ Return the positive percentage within each interval """
@@ -191,6 +196,17 @@ class CumulativeCounter:
         cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
         return [self.n_sample_between_keys(k1, k2) \
                     for k1, k2 in sorted_two_gram(cutoffs)]
+
+    def entropy_given_cutoffs(self, cutoffs):
+        """ Return the weighted sum of entropy for all the intervals """
+        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
+        
+        weight = np.array(self.n_sample_given_cutoffs(cutoffs))
+        weight = weight / weight.sum()
+
+        bin_entropy = np.array([self.entropy_between_keys(k1, k2) \
+                            for k1, k2 in sorted_two_gram(cutoffs)])
+        return (weight * bin_entropy).sum()
 
 
 class KSBinning(SupervisedBinning):
