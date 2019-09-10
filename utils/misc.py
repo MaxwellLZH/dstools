@@ -135,7 +135,7 @@ def weighted_sum(elements, weights=1):
 
 
 def limit_precision(x, n_digit=2):
-	""" Limit the precision of a float number """
+    """ Limit the precision of a float number """
     pattern = '{0:.' + str(n_digit) + 'f}'
     print(pattern)
     return float(pattern.format(x))
