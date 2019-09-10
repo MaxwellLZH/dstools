@@ -52,7 +52,7 @@ def list_docs(module):
 
 documentation = dict()
 
-for m in [utils, metrics, sklearn_extension]:
+for m in [metrics, sklearn_extension, utils]:
     documentation.update(list_docs(m))
 
 with open('./README.template', 'r') as f:

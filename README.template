@@ -1,6 +1,9 @@
-## Handy tools for data scientists
+# Handy tools for data scientists
 
-## List of handy tools
+![image](https://wyncode.co/uploads/2014/08/181.jpg)
+
+Available functions
+-------------------
 {% for name, doc in documentation.items() %}
 [{{ name }}](https://github.com/Max1993Liu/dstools/blob/master/{{ doc.file }}#L{{ doc.lineno }}) `{{ doc.doc }}`
 {% endfor %}

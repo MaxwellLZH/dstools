@@ -1,56 +1,9 @@
-## Handy tools for data scientists
+# Handy tools for data scientists
 
-## List of handy tools
+![image](https://wyncode.co/uploads/2014/08/181.jpg)
 
-[utils.capture_output](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L6) `Capture stdout and stderr as string.`
-
-[utils.check_same_length](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L30) `A decorator that checks all the arguments to be the same length`
-
-[utils.create_multilevel_index](https://github.com/Max1993Liu/dstools/blob/master/utils/dataframe.py#L6) `Create two-level multilevel index from given index names.`
-
-[utils.find_duplicates](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L116) `Find duplicate elements in an iterable`
-
-[utils.flatten_list](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L105) `Flatten a nested list regardless of the depth.`
-
-[utils.get_stats](https://github.com/Max1993Liu/dstools/blob/master/utils/timing.py#L27) `Return a pstats.Stats object from a statement.`
-
-[utils.groupby](https://github.com/Max1993Liu/dstools/blob/master/utils/__init__.py#L1) `groupby(iterable, key=None) -> make an iterator that returns consecutive`
-
-[utils.is_scalar_nan](https://github.com/Max1993Liu/dstools/blob/master/utils/__init__.py#L708) `Tests if x is NaN`
-
-[utils.iter_date](https://github.com/Max1993Liu/dstools/blob/master/utils/date.py#L8) `Iterate over days`
-
-[utils.limit_precision](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L137) `Limit the precision of a float number`
-
-[utils.maybe_mkdir](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L12) `Create directory when it didn't exist.`
-
-[utils.ngram](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L44) `Generating n-gram from iterable.`
-
-[utils.plot_distribution](https://github.com/Max1993Liu/dstools/blob/master/utils/stats.py#L6) `Show the plot for the specified distribution`
-
-[utils.print_source_code](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L24) `Print the source code of an object.`
-
-[utils.print_stats](https://github.com/Max1993Liu/dstools/blob/master/utils/timing.py#L42) `Print out the profiling detail from the statement sorted by *keys`
-
-[utils.read_csv](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L34) `Read multiple csv file and concatenate them row-wise`
-
-[utils.read_excel](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L39) `Read multiple excel file and concatenate them row-wise`
-
-[utils.read_multiple_files](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L28) `No documentation found.`
-
-[utils.read_sheets](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L44) `Read all the sheets in an excel file and concatenate them row-wise`
-
-[utils.return_default](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L79) `A decorator that checks the first argument, if meets the criteria then simply return the default_value`
-
-[utils.set_default](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L56) `A decorator that checks the first argument, if meets the criteria then replace it with default_value`
-
-[utils.timeit](https://github.com/Max1993Liu/dstools/blob/master/utils/timing.py#L6) `A decorator that times the function and logs the information.`
-
-[utils.today](https://github.com/Max1993Liu/dstools/blob/master/utils/date.py#L1) `Return the date of today as a string.`
-
-[utils.weighted_sum](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L126) `No documentation found.`
-
-[utils.write_dict_to_excel](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L50) `Save a dictionary to an Excel file with each key being the sheet name`
+Available functions
+-------------------
 
 [metrics.calculate_relationship](https://github.com/Max1993Liu/dstools/blob/master/metrics/similarity.py#L27) `Determine if y is positive|negative|unrelated with x`
 
@@ -133,3 +86,53 @@
 [sklearn_extension.sort_columns_tree](https://github.com/Max1993Liu/dstools/blob/master/sklearn_extension/utils/__init__.py#L130) `Sort columns according to feature importance in tree method`
 
 [sklearn_extension.woe](https://github.com/Max1993Liu/dstools/blob/master/sklearn_extension/feature_selection/univariate_selection.py#L7) `Return a series mapping feature value to its woe stats`
+
+[utils.capture_output](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L6) `Capture stdout and stderr as string.`
+
+[utils.check_same_length](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L30) `A decorator that checks all the arguments to be the same length`
+
+[utils.create_multilevel_index](https://github.com/Max1993Liu/dstools/blob/master/utils/dataframe.py#L6) `Create two-level multilevel index from given index names.`
+
+[utils.find_duplicates](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L116) `Find duplicate elements in an iterable`
+
+[utils.flatten_list](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L105) `Flatten a nested list regardless of the depth.`
+
+[utils.get_stats](https://github.com/Max1993Liu/dstools/blob/master/utils/timing.py#L27) `Return a pstats.Stats object from a statement.`
+
+[utils.groupby](https://github.com/Max1993Liu/dstools/blob/master/utils/__init__.py#L1) `groupby(iterable, key=None) -> make an iterator that returns consecutive`
+
+[utils.is_scalar_nan](https://github.com/Max1993Liu/dstools/blob/master/utils/__init__.py#L708) `Tests if x is NaN`
+
+[utils.iter_date](https://github.com/Max1993Liu/dstools/blob/master/utils/date.py#L8) `Iterate over days`
+
+[utils.limit_precision](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L137) `Limit the precision of a float number`
+
+[utils.maybe_mkdir](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L12) `Create directory when it didn't exist.`
+
+[utils.ngram](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L44) `Generating n-gram from iterable.`
+
+[utils.plot_distribution](https://github.com/Max1993Liu/dstools/blob/master/utils/stats.py#L6) `Show the plot for the specified distribution`
+
+[utils.print_source_code](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L24) `Print the source code of an object.`
+
+[utils.print_stats](https://github.com/Max1993Liu/dstools/blob/master/utils/timing.py#L42) `Print out the profiling detail from the statement sorted by *keys`
+
+[utils.read_csv](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L34) `Read multiple csv file and concatenate them row-wise`
+
+[utils.read_excel](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L39) `Read multiple excel file and concatenate them row-wise`
+
+[utils.read_multiple_files](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L28) `No documentation found.`
+
+[utils.read_sheets](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L44) `Read all the sheets in an excel file and concatenate them row-wise`
+
+[utils.return_default](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L79) `A decorator that checks the first argument, if meets the criteria then simply return the default_value`
+
+[utils.set_default](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L56) `A decorator that checks the first argument, if meets the criteria then replace it with default_value`
+
+[utils.timeit](https://github.com/Max1993Liu/dstools/blob/master/utils/timing.py#L6) `A decorator that times the function and logs the information.`
+
+[utils.today](https://github.com/Max1993Liu/dstools/blob/master/utils/date.py#L1) `Return the date of today as a string.`
+
+[utils.weighted_sum](https://github.com/Max1993Liu/dstools/blob/master/utils/misc.py#L126) `No documentation found.`
+
+[utils.write_dict_to_excel](https://github.com/Max1993Liu/dstools/blob/master/utils/io.py#L50) `Save a dictionary to an Excel file with each key being the sheet name`
