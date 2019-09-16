@@ -4,6 +4,7 @@ import warnings
 import statsmodels.api as sm
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from ..utils import sort_columns_logistic, sort_columns_tree
 
@@ -35,7 +36,7 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
         if mode not in ('forward', 'backward', 'bidirectional'):
             raise ValueError('Only support forward, backward and bidirectional mode.')
         self.cols = cols
-        self.max_feature = None
+        self.max_feature = max_feature
         self.mode = mode
         self.method = method
         self.refit = refit
@@ -92,7 +93,7 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
         """
         Return model coumns and a boolean indicating whether it should be the last step
         """
-        logit_result = self._fit_logistic(X[model_cols+[cand]], y)
+        logit_result = self._fit_logistic(X[model_cols], y)
         # TODO: Better handling when a LinAlgError is encountered
         if logit_result is None:
             warnings.warn('A LinAlgError is encountered during the backward step.')
@@ -121,26 +122,37 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
         # ignore the convergence warnings for now
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            
-            while not stop_sign:
-                if need_forward_step:
-                    candidate_cols, model_cols, forward_stop_sign = \
-                            self.forward_step(X, y, candidate_cols, model_cols)
-                if need_backward_step:
-                    model_cols, backward_stop_sign = self.backward_step(X, y, model_cols)
 
-                if self.mode == 'forward':
-                    stop_sign = forward_stop_sign
-                elif self.mode == 'bidirectional':
-                    stop_sign = forward_stop_sign and backward_stop_sign
-                else:
-                    stop_sign = backward_stop_sign
+            with tqdm() as pbar:
 
-                # Early stopping
-                if self.max_feature is not None:
-                    stop_sign = stop_sign and (len(model_cols) == self.max_feature + 1)
-        
-        model_cols.remove('const')
+                while not stop_sign:
+                    if need_forward_step:
+                        candidate_cols, model_cols, forward_stop_sign = \
+                                self.forward_step(X, y, candidate_cols, model_cols)
+                    if need_backward_step:
+                        model_cols, backward_stop_sign = self.backward_step(X, y, model_cols)
+
+                    if self.mode == 'forward':
+                        stop_sign = forward_stop_sign
+                    elif self.mode == 'bidirectional':
+                        stop_sign = forward_stop_sign and backward_stop_sign
+                    else:
+                        stop_sign = backward_stop_sign
+
+                    pbar.update()
+
+                    # Early stopping when max_feature is specified
+                    if self.max_feature is not None:
+                        n_model_cols = len([c for c in model_cols if c != 'const'])
+                        if self.mode in ('forward', 'bidirectional'):
+                            early_stop_sign = n_model_cols >= self.max_feature
+                        else:
+                            early_stop_sign = n_model_cols <= self.max_feature
+
+                        stop_sign = stop_sign or early_stop_sign
+
+        if 'const' in model_cols:
+            model_cols.remove('const')
         self.model_cols = model_cols
         
         if self.refit:
@@ -208,14 +220,14 @@ class StepwiseLogisticRegression(StepwiseBase):
             if p_value > self.alpha_enter:
                 continue
 
-            if self.criteria == 'p_value':
+            if self.criteria == 'p-value':
                 fet_rank.append((p_value, cand))
             elif self.criteria == 'aic':
                 fet_rank.append((logit_result.aic, cand))
             else:
                 wald = logit_result.params / np.square(logit_result.bse)
                 # the candidate feature is always the last one
-                wald = wald[-1]
+                wald = list(wald)[-1]
                 # use the negative wald-chi2
                 fet_rank.append((-wald, cand))
             
@@ -244,7 +256,6 @@ class IncrementalLogisticRegression(StepwiseLogisticRegression):
             refit=True, 
             **kwargs):
         super().__init__(self, 
-                cols=cols, 
                 alpha_enter=alpha_enter, 
                 alpha_exit=alpha_exit,
                 criteria=criteria,
@@ -253,6 +264,7 @@ class IncrementalLogisticRegression(StepwiseLogisticRegression):
                 method=method, 
                 refit=refit, 
                 **kwargs)
+        self.cols = cols
         self.sort_method = sort_method
 
     def fit(self, X, y, **fit_params):
