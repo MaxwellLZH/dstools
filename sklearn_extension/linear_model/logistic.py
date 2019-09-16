@@ -8,6 +8,9 @@ import pandas as pd
 from ..utils import sort_columns_logistic, sort_columns_tree
 
 
+__all__ = ['StepwiseLogisticRegression', 'IncrementalLogisticRegression']
+
+
 class StepwiseBase(BaseEstimator, ClassifierMixin):
     """ Base class for Stepwise LogisticRegression Model
         Subclasses should implement the following methods:
