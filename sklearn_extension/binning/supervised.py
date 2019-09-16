@@ -187,23 +187,6 @@ class SupervisedBinning(Binning):
         self.discrete_encoding[X.name] = pct_pos
         return X.map(pct_pos)
 
-    def get_interval_mapping(self, col_name: str):
-        """ Get the mapping from encoded value to its corresponding group. """
-        if self.bins is None:
-            raise NotFittedError('This {} is not fitted. Call the fit method first.'.format(self.__class__.__name__))
-
-        if col_name in self.discrete_encoding and isinstance(self.bins[col_name], list):
-            # categorical columns
-            encoding = self.discrete_encoding[col_name]
-            group = defaultdict(list)
-            for i, v in zip(searchsorted(self.bins[col_name], encoding), encoding.index):
-                group[i].append(v)
-            group = {k: '[' + ', '.join(map(str, v)) + ']' for k, v in group.items()}
-            group[0] = 'UNSEEN'
-            return group
-        else:
-            return super().get_interval_mapping(col_name)
-
     def _transform(self, X: pd.Series, y=None):
         """ Transform a single feature"""
         # map discrete value to its corresponding percentage of positive samples
