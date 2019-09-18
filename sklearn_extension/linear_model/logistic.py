@@ -275,7 +275,7 @@ class IncrementalLogisticRegression(StepwiseLogisticRegression):
         elif self.sort_method == 'tree':
             cols = sort_columns_tree(X, y, cols=cols)
             super().fit(X[cols], y, **fit_params)
-        elif self.sort_method == 'logistic':
+        elif self.sort_method in ('chi2', 'logistic'):
             cols = sort_columns_logistic(X, y, cols=cols)
             super().fit(X[cols], y, **fit_params)
         else:

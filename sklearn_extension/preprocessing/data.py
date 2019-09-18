@@ -283,7 +283,7 @@ class CorrelationRemover(BaseEstimator, TransformerMixin):
 
         if self.sort is True or self.sort == 'tree':
             cols = sort_columns_tree(X, y, cols)
-        elif self.sort == 'chi2':
+        elif self.sort in ('chi2', 'logistic'):
             cols = sort_columns_logistic(X, y, cols)
         elif self.sort is not False:
             raise ValueError('Sorting method not supported.')
