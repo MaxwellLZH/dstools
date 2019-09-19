@@ -234,6 +234,15 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
             _, x[col] = _encode_python(x[col], uniques=cutoff, encode=True, unseen=self.unseen)
         return x
 
+    def inverse_transform(self, X: pd.DataFrame, y=None):
+        x = X.copy()
+
+        for col in (set(X.columns) & set(self.categories_)):
+            mapping = self.categories_[col]
+            reverse_mapping = {k: v for k, v in enumerate(mapping)}
+            x[col] = x[col].map(reverse_mapping)
+        return x
+
 
 class CorrelationRemover(BaseEstimator, TransformerMixin):
 
