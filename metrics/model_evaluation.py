@@ -22,10 +22,11 @@ def lift_table(prediction, label, bins=10, mode='equal_width'):
         if mode == 'equal_width':
             lift_table['score_range'] = pd.cut(lift_table['prediction'], bins)
         elif mode.startswith('equal_freq'):
-            n_perbin = len(lift_table) // bins
-            lift_table = lift_table.sort_values('prediction', ascending=False) \
-                .reset_index(drop=True).reset_index()
-            lift_table['score_range'] = (lift_table['index'] / n_perbin).astype(int)
+            lift_table['score_range'] = pd.qcut(lift_table['prediction'], bins, duplicates='drop')
+            # n_perbin = len(lift_table) // bins
+            # lift_table = lift_table.sort_values('prediction', ascending=False) \
+            #     .reset_index(drop=True).reset_index()
+            # lift_table['score_range'] = (lift_table['index'] / n_perbin).astype(int)
         else:
             raise ValueError('Mode not supported')
 
