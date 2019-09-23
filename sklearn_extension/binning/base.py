@@ -165,7 +165,7 @@ class Binning(BaseEstimator, TransformerMixin):
                 else:
                     return float(left_edge)
 
-        if sort:
+        if sort and not isinstance(self.bins[col], dict):
             stats['_order'] = stats.index.map(get_left_edge)
             return stats.sort_values('_order').drop('_order', axis=1)
         else:
