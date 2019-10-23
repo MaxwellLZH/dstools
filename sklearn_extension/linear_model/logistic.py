@@ -23,6 +23,7 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
     def __init__(self, 
                  cols=None,
                  max_feature=None,
+                 force_positive_coef=True,
                  mode='forward', 
                  method='bfgs', 
                  refit=True,
@@ -30,6 +31,7 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
         """
         :param cols: columns ranked by importance from high to low, ex. iv
         :param mode: 'forward', 'backward' or 'bidirectional'
+        :param force_positive_coef: Whether the coefficients should be all positive
         :param kwargs: keyword arguments for fitting the LogisticRegression model in 
             fit() method
         """
@@ -37,6 +39,7 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
             raise ValueError('Only support forward, backward and bidirectional mode.')
         self.cols = cols
         self.max_feature = max_feature
+        self.force_positive_coef = force_positive_coef
         self.mode = mode
         self.method = method
         self.refit = refit
@@ -63,10 +66,25 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
             """ usually caused by multi-colinearity, simply ignore the column """
             return None
 
+    def _check_param(self, X, y, model_cols):
+        """ Check if there's any feature whose coefficients violates the constraint """
+        if not self.force_positive_coef:
+            return model_cols
+
+        logit_result = self._fit_logistic(X[model_cols], y)
+        coef = logit_result.params
+        keep_cols = [c for c in model_cols if (coef[c] > 0 or c == 'const')]
+
+        for c in model_cols:
+            if c not in keep_cols:
+                self.history.append(('Remove', c, 'violate constraint'))
+
+        return keep_cols
+
     def forward_step(self, X, y, candidate_cols, model_cols):
         """ Perform a single forward step
-            Return updated candidate columns, model columns and a boolean indicating
-            whether it should be the last step
+            Return (candidate columns, model columns, flag)
+            `flag` indicating whether the current step should be the last step
         """
         # prepare the `fit_results`, where each of them is a pair of column name and LogitResults
         fit_results = list()
@@ -85,13 +103,14 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
         if add_col is None:
             return candidate_cols, model_cols, True
         else:
-            self.history.append(('Add', add_col))
+            self.history.append(('Add', add_col, 'forward step'))
             candidate_cols = [c for c in candidate_cols if c != add_col]
             return candidate_cols, model_cols + [add_col], len(candidate_cols) == 0
         
     def backward_step(self, X, y, model_cols):
         """
-        Return model coumns and a boolean indicating whether it should be the last step
+            Return (model columns, flag)
+            `flag` indicating whether the current step should be the last step
         """
         logit_result = self._fit_logistic(X[model_cols], y)
         # TODO: Better handling when a LinAlgError is encountered
@@ -102,7 +121,7 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
         drop_cols = self.drop_features(logit_result)
         model_cols = [c for c in model_cols if c not in drop_cols]
         if drop_cols:
-            self.history.append(('Remove', drop_cols))
+            self.history.append(('Remove', drop_cols, 'backward step'))
         return model_cols, len(drop_cols) == 0
 
     def fit(self, X, y, **fit_params):
@@ -131,6 +150,9 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
                                 self.forward_step(X, y, candidate_cols, model_cols)
                     if need_backward_step:
                         model_cols, backward_stop_sign = self.backward_step(X, y, model_cols)
+
+                    # check coefficients
+                    model_cols = self._check_param(X, y, model_cols)
 
                     if self.mode == 'forward':
                         stop_sign = forward_stop_sign
