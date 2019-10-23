@@ -66,12 +66,16 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
             """ usually caused by multi-colinearity, simply ignore the column """
             return None
 
-    def _check_param(self, X, y, model_cols):
+    def _check_param(self, X, y, model_cols, model=None):
         """ Check if there's any feature whose coefficients violates the constraint """
         if not self.force_positive_coef:
             return model_cols
 
-        logit_result = self._fit_logistic(X[model_cols], y)
+        if model is None:
+            logit_result = self._fit_logistic(X[model_cols], y)
+        else:
+            logit_result = model
+
         coef = logit_result.params
         keep_cols = [c for c in model_cols if (coef[c] > 0 or c == 'const')]
 
@@ -83,7 +87,8 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
 
     def forward_step(self, X, y, candidate_cols, model_cols):
         """ Perform a single forward step
-            Return (candidate columns, model columns, flag)
+            Return (candidate columns, model columns, model, flag)
+            `model` is the fitted model with the returned model columns
             `flag` indicating whether the current step should be the last step
         """
         # prepare the `fit_results`, where each of them is a pair of column name and LogitResults
@@ -101,11 +106,15 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
         add_col = self.add_feature(fit_results)
 
         if add_col is None:
-            return candidate_cols, model_cols, True
+            return candidate_cols, model_cols, None, True
         else:
             self.history.append(('Add', add_col, 'forward step'))
             candidate_cols = [c for c in candidate_cols if c != add_col]
-            return candidate_cols, model_cols + [add_col], len(candidate_cols) == 0
+
+            # find the model with the selected `add_col`
+            model = [i for i in fit_results if i[0] == add_col][0][1]
+
+            return candidate_cols, model_cols + [add_col], model, len(candidate_cols) == 0
         
     def backward_step(self, X, y, model_cols):
         """
@@ -145,14 +154,15 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
             with tqdm() as pbar:
 
                 while not stop_sign:
+                    latest_model = None
                     if need_forward_step:
-                        candidate_cols, model_cols, forward_stop_sign = \
+                        candidate_cols, model_cols, latest_model, forward_stop_sign = \
                                 self.forward_step(X, y, candidate_cols, model_cols)
                     if need_backward_step:
                         model_cols, backward_stop_sign = self.backward_step(X, y, model_cols)
 
                     # check coefficients
-                    model_cols = self._check_param(X, y, model_cols)
+                    model_cols = self._check_param(X, y, model_cols, latest_model)
 
                     if self.mode == 'forward':
                         stop_sign = forward_stop_sign
