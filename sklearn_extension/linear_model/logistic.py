@@ -215,8 +215,8 @@ class StepwiseLogisticRegression(StepwiseBase):
 
     def __init__(self, 
                 cols=None, 
-                alpha_enter=0.15, 
-                alpha_exit=0.15,
+                alpha_enter=0.05, 
+                alpha_exit=0.05,
                 criteria='p-value',
                 max_feature=None,
                 mode='forward',
