@@ -7,7 +7,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.exceptions import NotFittedError
 
 
-__all__ = ['return_frame', 'ConditionalWrapper']
+__all__ = ['return_frame', 'ConditionalWrapper', 'timingWrapper']
 
 
 def _pass_index_and_columns(f):
