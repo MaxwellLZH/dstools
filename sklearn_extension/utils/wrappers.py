@@ -1,3 +1,4 @@
+import time
 import re
 import pandas as pd
 import numpy as np
@@ -157,3 +158,36 @@ class ConditionalWrapper(BaseEstimator, TransformerMixin):
     def __getattr__(self, item):
         return getattr(self.estimator, item)
 
+
+from dateutil.relativedelta import relativedelta
+from datetime import datetime
+
+
+def _pretty_print_timedelta(timedelta: relativedelta):
+    return '%s hours %s minutes %s seconds' % (timedelta.hours, timedelta.minutes, timedelta.seconds)
+
+
+def timingWrapper(cls):
+
+    cls_name = cls.__name__
+
+    def timing_decorater(f):
+        f_name = f.__name__
+
+        # @functools.wraps
+        def wrapped(*args, **kwargs):
+            print('Start running 【{}.{}】'.format(cls_name, f_name))
+            start = datetime.now()
+            res = f(*args, **kwargs)
+            duration = relativedelta(datetime.now(), start)
+            print('Finish running 【{}.{}】.'
+                ' Total time: {}'.format(cls_name, f_name, _pretty_print_timedelta(duration)))
+            return res
+
+        return wrapped
+
+    # decorate both fit and transform function (if any)
+    setattr(cls, 'fit', timing_decorater(getattr(cls, 'fit')))
+    if hasattr(cls, 'transform'):
+        setattr(cls, 'transform', timing_decorater(getattr(cls, 'transform')))
+    return cls
