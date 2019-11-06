@@ -205,12 +205,11 @@ class OrdinalEncoder(BaseEstimator, TransformerMixin):
 
         if not self.fill:
             assert_all_finite(X, allow_nan=False)
-        else:
-            X = X.copy().fillna('_MISSING')
+
         self.categories_ = dict()
 
         for col in cols:
-            cutoff = _encode_python(X[col].astype(str))
+            cutoff = _encode_python(X[col].fillna('_MISSING').astype(str))
             self.categories_[col] = cutoff
         return self
 
