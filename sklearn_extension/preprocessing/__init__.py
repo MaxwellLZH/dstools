@@ -8,5 +8,8 @@ __all__ = [
     'QuantileOutlierRemover',
     'OrdinalEncoder',
     'CorrelationRemover',
-    'SparsityRemover'
+    'SparsityRemover',
+    'StandardScaler',
+    'MinMaxScaler',
+    'RobustScaler'
 ]
