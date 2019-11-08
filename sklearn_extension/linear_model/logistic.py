@@ -136,7 +136,7 @@ class StepwiseBase(BaseEstimator, ClassifierMixin):
     def fit(self, X, y, **fit_params):
         cols = self.cols or X.columns.tolist()
         self.history = list()
-        X = sm.add_constant(X.copy())
+        X = sm.add_constant(X.copy(), has_constant='add')
         
         need_forward_step = self.mode in ('forward', 'bidirectional')
         need_backward_step = self.mode in ('bidirectional', 'backward')
