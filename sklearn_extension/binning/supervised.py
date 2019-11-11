@@ -136,17 +136,19 @@ class CumulativeCounter:
         pct_pos, pct_neg = np.clip([pct_pos, pct_neg], a_min=1e-10, a_max=1 - 1e-10)
         return (pct_pos - pct_neg) * np.log(pct_pos / pct_neg)
     
-    def pct_pos_given_cutoffs(self, cutoffs):
+    def pct_pos_given_cutoffs(self, cutoffs, include_edge=True):
         """ Return the positive percentage within each interval """
-        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
-        return [self.pct_pos_between_keys(k1, k2) \
-                    for k1, k2 in sorted_two_gram(cutoffs)]
+        if include_edge:
+            cutoffs = set([min(self.keys())] + cutoffs + [max(self.keys())])
+        return np.array([self.pct_pos_between_keys(k1, k2) \
+                    for k1, k2 in sorted_two_gram(cutoffs)])
     
-    def n_sample_given_cutoffs(self, cutoffs):
+    def n_sample_given_cutoffs(self, cutoffs, include_edge=True):
         """ Return number of samples within each interval """
-        cutoffs = [min(self.keys())] + cutoffs + [max(self.keys())]
-        return [self.n_sample_between_keys(k1, k2) \
-                    for k1, k2 in sorted_two_gram(cutoffs)]
+        if include_edge:
+            cutoffs = set([min(self.keys())] + cutoffs + [max(self.keys())])
+        return np.array([self.n_sample_between_keys(k1, k2) \
+                    for k1, k2 in sorted_two_gram(cutoffs)])
 
     def entropy_given_cutoffs(self, cutoffs):
         """ Return the weighted sum of entropy for all the intervals """
@@ -290,6 +292,34 @@ class TopDownBinning(SupervisedBinning):
         else:
             return cutoffs, False
 
+    def _enforce_bin_constraints(self, counter, cutoffs):
+        """ Enforce the monotonic and minimum sample percentage constraints """
+        pct_pos_bin = counter.pct_pos_given_cutoffs(cutoffs, include_edge=False)
+        n_sample_bin = counter.n_sample_given_cutoffs(cutoffs, include_edge=False)
+        pct_sample_bin = n_sample_bin / counter.total_sample_with_null
+
+        while min(pct_sample_bin) < self.min_interval_size and len(cutoffs) > 2:
+            min_idx = np.argmin(pct_sample_bin)
+
+            # cutoffs =  [0, 1, 2, 3, 4]
+            # bin_idx =    [0, 1, 2, 3]
+            # pick one of cutoff points at (min_idx, min_idx+1) to drop
+            if min_idx == 0:
+                _ = cutoffs.pop(1)
+            elif min_idx == len(pct_sample_bin):
+                _ = cutoffs.pop(-1)
+            else:
+                # merge with the bin with smaller population
+                if n_sample_bin[min_idx-1] < n_sample_bin[min_idx]:
+                    _ = cutoffs.pop(min_idx)
+                else:
+                    _ = cutoffs.pop(min_idx+1)
+     
+            pct_pos_bin = counter.pct_pos_given_cutoffs(cutoffs, include_edge=False)
+            n_sample_bin = counter.n_sample_given_cutoffs(cutoffs, include_edge=False)
+            pct_sample_bin = n_sample_bin / counter.total_sample_with_null
+
+        return cutoffs              
 
     def _fit(self, X, y, **fit_parmas):
         """ Fit a single feature and return the cutoff points"""
@@ -310,20 +340,23 @@ class TopDownBinning(SupervisedBinning):
             X = self.encode_with_label(X, y)
 
         n_bins = X.nunique()
+        
         if n_bins < self.max_bin:
-            return None
+            counter = CumulativeCounter(X, y, bins=None)
+            cutoffs = sorted(X.unique())
+        else:
+            # create the counter and initialize cutoff points
+            # also create a flag indicating whether the binning process should stop
+            counter = CumulativeCounter(X, y, bins=self.prebin if n_bins > self.prebin else None)
+            cutoffs = list()
+            continue_flag = True
 
-        # create the counter and initialize cutoff points
-        # also create a flag indicating whether the binning process should stop
-        counter = CumulativeCounter(X, y, bins=self.prebin if n_bins > self.prebin else None)
-        cutoffs = list()
-        continue_flag = True
+            while continue_flag and len(cutoffs) + 1 < self.max_bin:
+                cutoffs, continue_flag = self._find_single_split(counter, cutoffs)
+            cutoffs = [X.min()] + cutoffs
 
-        while continue_flag and len(cutoffs) + 1 < self.max_bin:
-            cutoffs, continue_flag = self._find_single_split(counter, cutoffs) 
-
-        return [X.min()] + cutoffs
-
+        cutoffs = self._enforce_bin_constraints(counter, cutoffs)
+        return cutoffs
 
 
 def _ks_score(counter: CumulativeCounter, candidate_cutoffs: list, cutoffs: list=None):

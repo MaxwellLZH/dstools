@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from collections import defaultdict
 from collections.abc import Iterable
 from sklearn.base import BaseEstimator, TransformerMixin
