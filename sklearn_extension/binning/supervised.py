@@ -343,7 +343,7 @@ class TopDownBinning(SupervisedBinning):
         
         if n_bins < self.max_bin:
             counter = CumulativeCounter(X, y, bins=None)
-            cutoffs = sorted(X.unique())
+            cutoffs = sorted(X.dropna().unique())
         else:
             # create the counter and initialize cutoff points
             # also create a flag indicating whether the binning process should stop
