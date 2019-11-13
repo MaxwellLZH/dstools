@@ -298,7 +298,7 @@ class TopDownBinning(SupervisedBinning):
         n_sample_bin = counter.n_sample_given_cutoffs(cutoffs, include_edge=False)
         pct_sample_bin = n_sample_bin / counter.total_sample_with_null
 
-        while min(pct_sample_bin) < self.min_interval_size and len(cutoffs) > 2:
+        while len(cutoffs) > 2 and min(pct_sample_bin) < self.min_interval_size:
             min_idx = np.argmin(pct_sample_bin)
 
             # cutoffs =  [0, 1, 2, 3, 4]
