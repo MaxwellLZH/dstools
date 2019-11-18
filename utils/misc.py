@@ -139,3 +139,18 @@ def limit_precision(x, n_digit=2):
     pattern = '{0:.' + str(n_digit) + 'f}'
     print(pattern)
     return float(pattern.format(x))
+
+
+def to_hash(value):
+    """
+    Hashes values for hashing trick.
+    Treats numbers as strings.
+
+    :param value: Any value that should be trated as category.
+    :return: hashed value.
+    """
+    if not isinstance(value, bytes):
+        value = str(value).encode('utf-8')
+    hex_value = sha256(value).hexdigest()
+    int_hash = int(hex_value, 16)
+    return int_hash
