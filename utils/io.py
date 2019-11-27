@@ -25,20 +25,23 @@ def capture_output():
         out[1] = out[1].getvalue().splitlines()
 
 
-def read_multiple_files(read_fn, path, **kwargs):
+def read_multiple_files(read_fn, path, reset_index=True, **kwargs):
     from glob import iglob
     files = [read_fn(f, **kwargs) for f in iglob(path)]
-    return pd.concat(files, axis=0)
+    print('Reading files: {}'.format(files))
+    df = pd.concat(files, axis=0)
+    if reset_index:
+        return df.reset_index(drop=True)
 
 
 def read_csv(path, **kwargs):
     """ Read multiple csv file and concatenate them row-wise """
-    return read_multiple_files(pd.read_csv, path, **kwargs)
+    return read_multiple_files(pd.read_csv, path, reset_index=True, **kwargs)
 
 
 def read_excel(path, **kwargs):
     """ Read multiple excel file and concatenate them row-wise"""
-    return read_multiple_files(pd.read_excel, path, **kwargs)
+    return read_multiple_files(pd.read_excel, path, reset_index=True, **kwargs)
 
 
 def read_sheets(path, **kwargs):
