@@ -156,7 +156,7 @@ class QuantileOutlierRemover(BaseEstimator, TransformerMixin):
 
     def fit(self, X: pd.DataFrame, y=None):
         cols = self.cols or X.select_dtypes(include='number').columns.tolist()
-        self.skewness = skewness = pd.Series(skew(X[cols]), index=cols)
+        self.skewness = skewness = pd.Series(skew(X[cols], nan_policy='omit'), index=cols)
         self.pos_skew_cols = pos_skew_cols = skewness[skewness > self.skewness_threshold].index.tolist()
         self.neg_skew_cols = neg_skew_cols = skewness[skewness < -self.skewness_threshold].index.tolist()
 
