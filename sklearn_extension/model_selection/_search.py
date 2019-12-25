@@ -297,10 +297,11 @@ class OrderedGridSearchCV(BaseSearchCV):
                  pre_dispatch='2*n_jobs', error_score='raise-deprecating',
                  return_train_score='warn'):
         super().__init__(
-            estimator=estimator, scoring=scoring, fit_params=fit_params,
+            estimator=estimator, scoring=scoring,
             n_jobs=n_jobs, iid=iid, refit=refit, cv=cv, verbose=verbose,
             pre_dispatch=pre_dispatch, error_score=error_score,
             return_train_score=return_train_score)
+        self.fit_params = fit_params
         # keep track of the best parameters as we go
         self.best_params_ = dict()
         self.param_grid = OrderedParameterGrid(param_grid, expand_edge=expand_edge, finer_grid=finer_grid)
